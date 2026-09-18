@@ -1,0 +1,500 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Tenancy & auth
+// ---------------------------------------------------------------------------
+
+model Garage {
+  id           String   @id @default(cuid())
+  name         String
+  address      String   @default("")
+  phone        String   @default("")
+  email        String   @default("")
+  siret        String   @default("")
+  vatRate      Decimal  @default(20.00) @db.Decimal(5, 2)
+  workOrderSeq Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  users      User[]
+  customers  Customer[]
+  vehicles   Vehicle[]
+  workOrders WorkOrder[]
+  photos     Photo[]
+  findings   Finding[]
+  damages    Damage[]
+  checklist  ChecklistItem[]
+  estimates  Estimate[]
+  events     TimelineEvent[]
+  audits     AuditLog[]
+  approvals  Approval[]
+}
+
+enum Role {
+  OWNER
+  RECEPTION
+  TECHNICIAN
+}
+
+model User {
+  id           String   @id @default(cuid())
+  garageId     String
+  email        String   @unique
+  passwordHash String
+  firstName    String
+  lastName     String
+  role         Role     @default(TECHNICIAN)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  garage         Garage               @relation(fields: [garageId], references: [id], onDelete: Cascade)
+  sessions       Session[]
+  resetTokens    PasswordResetToken[]
+  assignedOrders WorkOrder[]          @relation("Technician")
+  createdOrders  WorkOrder[]          @relation("CreatedBy")
+  photos         Photo[]
+  findings       Finding[]
+  damages        Damage[]
+  checklistItems ChecklistItem[]
+  events         TimelineEvent[]
+  audits         AuditLog[]
+  approvalTokens ApprovalToken[]
+  finalChecks    FinalCheck[]
+
+  @@index([garageId])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  ip        String   @default("")
+  userAgent String   @default("")
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// Customers & vehicles
+// ---------------------------------------------------------------------------
+
+model Customer {
+  id        String   @id @default(cuid())
+  garageId  String
+  firstName String
+  lastName  String
+  phone     String   @default("")
+  email     String   @default("")
+  address   String   @default("")
+  notes     String   @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  garage     Garage      @relation(fields: [garageId], references: [id], onDelete: Cascade)
+  vehicles   Vehicle[]
+  workOrders WorkOrder[]
+
+  @@index([garageId, lastName, firstName])
+  @@index([garageId, phone])
+}
+
+enum FuelType {
+  PETROL
+  DIESEL
+  HYBRID
+  ELECTRIC
+  LPG
+  OTHER
+}
+
+model Vehicle {
+  id         String   @id @default(cuid())
+  garageId   String
+  customerId String
+  plate      String
+  vin        String   @default("")
+  make       String
+  model      String
+  year       Int?
+  fuel       FuelType @default(DIESEL)
+  mileage    Int      @default(0)
+  color      String   @default("")
+  notes      String   @default("")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  garage     Garage      @relation(fields: [garageId], references: [id], onDelete: Cascade)
+  customer   Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  workOrders WorkOrder[]
+
+  @@unique([garageId, plate])
+  @@index([garageId, vin])
+  @@index([customerId])
+}
+
+// ---------------------------------------------------------------------------
+// Work orders (intervention files)
+// ---------------------------------------------------------------------------
+
+enum WorkOrderStatus {
+  ARRIVED
+  WAITING_DIAGNOSIS
+  DIAGNOSIS_IN_PROGRESS
+  WAITING_CUSTOMER_APPROVAL
+  APPROVED
+  PARTIALLY_APPROVED
+  WAITING_PARTS
+  REPAIR_IN_PROGRESS
+  QUALITY_CONTROL
+  READY_FOR_PICKUP
+  DELIVERED
+  CLOSED
+  CANCELLED
+}
+
+model WorkOrder {
+  id           String          @id @default(cuid())
+  garageId     String
+  number       String
+  customerId   String
+  vehicleId    String
+  technicianId String?
+  createdById  String
+  status       WorkOrderStatus @default(ARRIVED)
+  mileageIn    Int
+  mileageOut   Int?
+  reason       String
+  symptoms     String          @default("")
+  promisedAt   DateTime?
+  deliveredAt  DateTime?
+  closedAt     DateTime?
+  cancelledAt  DateTime?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  garage     Garage          @relation(fields: [garageId], references: [id], onDelete: Cascade)
+  customer   Customer        @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  vehicle    Vehicle         @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  technician User?           @relation("Technician", fields: [technicianId], references: [id], onDelete: SetNull)
+  createdBy  User            @relation("CreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  photos     Photo[]
+  findings   Finding[]
+  damages    Damage[]
+  checklist  ChecklistItem[]
+  estimates  Estimate[]
+  events     TimelineEvent[]
+  finalCheck FinalCheck?
+
+  @@unique([garageId, number])
+  @@index([garageId, status])
+  @@index([vehicleId])
+  @@index([customerId])
+  @@index([technicianId])
+}
+
+enum PhotoType {
+  FRONT
+  REAR
+  LEFT
+  RIGHT
+  INTERIOR
+  DASHBOARD
+  DAMAGE
+  FINDING
+  CHECKLIST
+  OTHER
+}
+
+model Photo {
+  id          String    @id @default(cuid())
+  garageId    String
+  workOrderId String
+  type        PhotoType @default(OTHER)
+  storageKey  String    @unique
+  mimeType    String
+  size        Int
+  width       Int?
+  height      Int?
+  comment     String    @default("")
+  authorId    String
+  findingId   String?
+  damageId    String?
+  checklistId String?
+  createdAt   DateTime  @default(now())
+
+  garage    Garage         @relation(fields: [garageId], references: [id], onDelete: Cascade)
+  workOrder WorkOrder      @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  author    User           @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  finding   Finding?       @relation(fields: [findingId], references: [id], onDelete: SetNull)
+  damage    Damage?        @relation(fields: [damageId], references: [id], onDelete: SetNull)
+  checklist ChecklistItem? @relation(fields: [checklistId], references: [id], onDelete: SetNull)
+
+  @@index([workOrderId])
+  @@index([garageId])
+}
+
+enum DamageType {
+  SCRATCH
+  DENT
+  IMPACT
+  RIM
+  WINDSHIELD
+  OTHER
+}
+
+model Damage {
+  id          String     @id @default(cuid())
+  garageId    String
+  workOrderId String
+  type        DamageType
+  location    String
+  description String     @default("")
+  authorId    String
+  createdAt   DateTime   @default(now())
+
+  garage    Garage    @relation(fields: [garageId], references: [id], onDelete: Cascade)
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  author    User      @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  photos    Photo[]
+
+  @@index([workOrderId])
+}
+
+enum Urgency {
+  INFO
+  WATCH
+  RECOMMENDED
+  URGENT
+  CRITICAL
+}
+
+model Finding {
+  id          String   @id @default(cuid())
+  garageId    String
+  workOrderId String
+  title       String
+  category    String
+  description String   @default("")
+  urgency     Urgency  @default(INFO)
+  authorId    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  garage    Garage         @relation(fields: [garageId], references: [id], onDelete: Cascade)
+  workOrder WorkOrder      @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  author    User           @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  photos    Photo[]
+  lines     EstimateLine[]
+
+  @@index([workOrderId])
+}
+
+enum CheckStatus {
+  NOT_CHECKED
+  OK
+  WATCH
+  RECOMMENDED
+  URGENT
+}
+
+model ChecklistItem {
+  id          String      @id @default(cuid())
+  garageId    String
+  workOrderId String
+  key         String
+  status      CheckStatus @default(NOT_CHECKED)
+  comment     String      @default("")
+  updatedById String?
+  updatedAt   DateTime    @updatedAt
+
+  garage    Garage    @relation(fields: [garageId], references: [id], onDelete: Cascade)
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  updatedBy User?     @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+  photos    Photo[]
+
+  @@unique([workOrderId, key])
+}
+
+// ---------------------------------------------------------------------------
+// Estimates & customer approval
+// ---------------------------------------------------------------------------
+
+enum EstimateStatus {
+  DRAFT
+  SENT
+  DECIDED
+  SUPERSEDED
+}
+
+model Estimate {
+  id          String         @id @default(cuid())
+  garageId    String
+  workOrderId String
+  version     Int
+  status      EstimateStatus @default(DRAFT)
+  note        String         @default("")
+  sentAt      DateTime?
+  decidedAt   DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  garage    Garage          @relation(fields: [garageId], references: [id], onDelete: Cascade)
+  workOrder WorkOrder       @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  lines     EstimateLine[]
+  tokens    ApprovalToken[]
+  approval  Approval?
+
+  @@unique([workOrderId, version])
+  @@index([garageId])
+}
+
+enum LineDecision {
+  PENDING
+  ACCEPTED
+  REFUSED
+}
+
+enum WorkStatus {
+  TODO
+  DONE
+}
+
+model EstimateLine {
+  id          String       @id @default(cuid())
+  estimateId  String
+  findingId   String?
+  position    Int          @default(0)
+  title       String
+  description String       @default("")
+  partsPrice  Decimal      @db.Decimal(10, 2)
+  laborPrice  Decimal      @db.Decimal(10, 2)
+  vatRate     Decimal      @db.Decimal(5, 2)
+  totalHt     Decimal      @db.Decimal(10, 2)
+  vatAmount   Decimal      @db.Decimal(10, 2)
+  totalTtc    Decimal      @db.Decimal(10, 2)
+  urgency     Urgency      @default(RECOMMENDED)
+  decision    LineDecision @default(PENDING)
+  workStatus  WorkStatus   @default(TODO)
+  createdAt   DateTime     @default(now())
+
+  estimate Estimate @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+  finding  Finding? @relation(fields: [findingId], references: [id], onDelete: SetNull)
+
+  @@index([estimateId])
+}
+
+model ApprovalToken {
+  id          String    @id @default(cuid())
+  estimateId  String
+  tokenHash   String    @unique
+  expiresAt   DateTime
+  createdById String
+  usedAt      DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  estimate  Estimate @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+  createdBy User     @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([estimateId])
+}
+
+model Approval {
+  id            String   @id @default(cuid())
+  garageId      String
+  estimateId    String   @unique
+  acceptedTotal Decimal  @db.Decimal(10, 2)
+  refusedTotal  Decimal  @db.Decimal(10, 2)
+  acceptedCount Int
+  refusedCount  Int
+  customerName  String   @default("")
+  comment       String   @default("")
+  ip            String   @default("")
+  userAgent     String   @default("")
+  snapshot      Json
+  decidedAt     DateTime @default(now())
+
+  garage   Garage   @relation(fields: [garageId], references: [id], onDelete: Cascade)
+  estimate Estimate @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+}
+
+// ---------------------------------------------------------------------------
+// Final check, timeline, audit
+// ---------------------------------------------------------------------------
+
+model FinalCheck {
+  id            String   @id @default(cuid())
+  workOrderId   String   @unique
+  roadTest      Boolean  @default(false)
+  fluids        Boolean  @default(false)
+  warningLights Boolean  @default(false)
+  toolsRemoved  Boolean  @default(false)
+  cleaned       Boolean  @default(false)
+  comment       String   @default("")
+  checkedById   String
+  checkedAt     DateTime @default(now())
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  checkedBy User      @relation(fields: [checkedById], references: [id], onDelete: Restrict)
+}
+
+model TimelineEvent {
+  id          String   @id @default(cuid())
+  garageId    String
+  workOrderId String
+  type        String
+  message     String
+  actorId     String?
+  actorLabel  String   @default("")
+  payload     Json?
+  createdAt   DateTime @default(now())
+
+  garage    Garage    @relation(fields: [garageId], references: [id], onDelete: Cascade)
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  actor     User?     @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([workOrderId, createdAt])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  garageId   String?
+  userId     String?
+  action     String
+  entityType String
+  entityId   String   @default("")
+  metadata   Json?
+  ip         String   @default("")
+  createdAt  DateTime @default(now())
+
+  garage Garage? @relation(fields: [garageId], references: [id], onDelete: Cascade)
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([garageId, createdAt])
+}
