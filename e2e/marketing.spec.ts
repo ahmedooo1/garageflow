@@ -32,11 +32,38 @@ test("la page d'accueil présente le produit, le parcours et les tarifs", async 
   await expect(page.getByText(/Ils reçoivent un lien personnel/)).toBeVisible();
 });
 
-test("les appels à l'action mènent à la création de garage", async ({ page }) => {
+test("l'action principale porte le même libellé partout et mène à l'inscription", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("link", { name: "Ouvrir un dossier d'essai" }).click();
+
+  // Un seul libellé d'action principale sur toute la page.
+  const principal = page.getByRole("link", { name: "Essayer 14 jours gratuitement" });
+  expect(await principal.count()).toBeGreaterThanOrEqual(3);
+  for (const lien of await principal.all()) {
+    await expect(lien).toHaveAttribute("href", "/register");
+  }
+
+  // L'action secondaire reste une exploration, pas une inscription.
+  await expect(page.getByRole("link", { name: /Voir le parcours complet/ })).toHaveAttribute("href", "#parcours");
+
+  await principal.nth(1).click();
   await expect(page).toHaveURL(/\/register/);
   await expect(page.getByRole("heading", { name: "Créer votre garage" })).toBeVisible();
+});
+
+test("le tableau de tarifs reste lisible sur mobile", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  const tarifs = page.getByRole("table", { name: "Tarifs GarageFlow" });
+  await tarifs.scrollIntoViewIfNeeded();
+
+  // Chaque ligne reste associée à ses intitulés, empilée plutôt que compressée.
+  const ligneAtelier = tarifs.getByRole("row").filter({ hasText: "Atelier" });
+  await expect(ligneAtelier).toContainText("59 €");
+  await expect(ligneAtelier).toContainText("Engagement");
+
+  // Aucun débordement horizontal de la page.
+  const debordement = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(debordement).toBe(0);
 });
 
 test("les pages légales sont accessibles depuis le pied de page", async ({ page }) => {

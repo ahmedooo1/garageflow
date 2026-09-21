@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { publicFontVars } from "@/lib/fonts";
 
+/** Formulation unique de l’action principale, reprise à l’identique partout. */
+export const PRIMARY_CTA = "Essayer 14 jours gratuitement";
+
 const SECTIONS = [
   { href: "/#dossier", label: "Dossier" },
   { href: "/#parcours", label: "Parcours" },
@@ -28,21 +31,23 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
             <Wordmark />
           </Link>
 
-          <nav className="ml-8 hidden flex-1 items-center gap-7 lg:flex" aria-label="Sections">
+          <nav className="ml-8 hidden flex-1 items-center gap-6 xl:flex" aria-label="Sections">
             {SECTIONS.map((s, i) => (
-              <Link key={s.href} href={s.href} className="field-tag transition-colors hover:text-[var(--ink)]">
+              <Link key={s.href} href={s.href} className="field-tag field-tag--xs transition-colors hover:text-[var(--ink)]">
                 <span className="mark">{String(i + 1).padStart(2, "0")}</span> {s.label}
               </Link>
             ))}
           </nav>
 
-          <div className="ml-auto flex shrink-0 items-center gap-4 sm:gap-6">
-            <Link href="/login" className="field-tag transition-colors hover:text-[var(--ink)]">
+          <div className="ml-auto flex shrink-0 items-center gap-3 sm:gap-6">
+            <Link href="/login" className="field-tag field-tag--xs hidden transition-colors hover:text-[var(--ink)] sm:inline">
               Connexion
             </Link>
-            <Link href="/register" className="link-arrow text-sm">
-              Essai<span className="hidden sm:inline">&nbsp;14 jours</span>
-              <span aria-hidden>→</span>
+            <Link href="/register" className="link-arrow text-xs sm:text-sm">
+              {PRIMARY_CTA}
+              <span aria-hidden className="hidden sm:inline">
+                →
+              </span>
             </Link>
           </div>
         </div>
@@ -68,7 +73,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
               <FooterColumn
                 tag="Compte"
                 links={[
-                  { href: "/register", label: "Créer un garage" },
+                  { href: "/register", label: PRIMARY_CTA },
                   { href: "/login", label: "Connexion" },
                   { href: "/forgot-password", label: "Mot de passe oublié" },
                 ]}

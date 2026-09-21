@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { CHECKLIST_SECTIONS, STATUS_LABELS } from "@/lib/labels";
 import { formatPriceHt, PLANS, TRIAL_DAYS } from "@/lib/plans";
 import { getSession } from "@/server/auth/session";
+import { PRIMARY_CTA } from "./layout";
 
 export const metadata: Metadata = {
   title: "GarageFlow · Logiciel d'atelier pour garages indépendants",
@@ -73,8 +74,49 @@ const FICHE = [
   { k: "Périmètre", v: "Réception → diagnostic → restitution" },
   { k: "Support", v: "Tablette d'atelier, ordinateur, téléphone" },
   { k: "Mise en route", v: "Environ 15 minutes" },
+  { k: "Tarif", v: `À partir de ${formatPriceHt(PLANS.ATELIER)} HT par mois` },
   { k: "Essai", v: `${TRIAL_DAYS} jours, sans carte bancaire` },
 ];
+
+/**
+ * Présence produit du haut de page : l'en-tête d'un dossier d'intervention,
+ * repris de l'écran principal de l'application. Un bandeau, pas une maquette.
+ */
+function DossierStrip() {
+  const champs = [
+    { k: "Client", v: "Jean Martin" },
+    { k: "Kilométrage", v: "87 650 km" },
+    { k: "Technicien", v: "Karim Benali" },
+    { k: "Restitution prévue", v: "Aujourd'hui 17:00" },
+  ];
+  return (
+    <figure className="mt-16">
+      <div className="rule-heavy pt-4">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+          <span className="tech text-sm text-[var(--ink-soft)]">OR 2026-0001</span>
+          <PlateFr value="GH-123-KL" className="text-sm" />
+          <span className="display text-2xl">Peugeot 308</span>
+          <span className="field-tag field-tag--xs ml-auto border border-[var(--rule-strong)] px-2.5 py-1 text-[var(--ink)]">Diagnostic en cours</span>
+        </div>
+
+        <dl className="mt-5 grid grid-cols-2 gap-x-8 gap-y-4 sm:grid-cols-4">
+          {champs.map((c) => (
+            <div key={c.k}>
+              <dt className="field-tag field-tag--xs">{c.k}</dt>
+              <dd className="mt-1 text-[0.9375rem] font-semibold">{c.v}</dd>
+            </div>
+          ))}
+        </dl>
+
+        <p className="rule-t mt-5 pt-3 text-sm text-[var(--ink-soft)]">
+          <span className="field-tag field-tag--xs mr-2">Motif</span>
+          Bruit au freinage + révision
+        </p>
+      </div>
+      <figcaption className="field-tag field-tag--xs mt-3">En-tête d&apos;un dossier d&apos;intervention, tel qu&apos;il apparaît dans GarageFlow.</figcaption>
+    </figure>
+  );
+}
 
 const SOMMAIRE = [
   { n: "01", href: "#dossier", label: "Le dossier", note: "Ce que l'atelier a sous les yeux" },
@@ -97,19 +139,19 @@ function Ouverture() {
           L&apos;atelier sous contrôle, du client à <span className="mark-rule">la clé rendue</span>.
         </h1>
 
-        <div className="mt-14 grid gap-12 md:grid-cols-12 md:gap-8">
+        <div className="mt-12 grid gap-12 md:grid-cols-12 md:gap-8">
           <div className="md:col-span-6">
-            <p className="measure text-xl leading-[1.55]">
-              Un véhicule entre. Il est photographié, diagnostiqué, chiffré. Le client répond par écrit, ligne par ligne. L&apos;atelier ne travaille que
-              sur ce qui a été accepté. Le véhicule ressort, et tout est resté dans le dossier.
+            <p className="measure text-xl leading-[1.5]">
+              Un véhicule entre. Il est photographié, diagnostiqué, chiffré. Le client accepte ou refuse chaque ligne, par écrit. L&apos;atelier ne
+              travaille que sur ce qui a été accepté.
             </p>
-            <p className="measure mt-5 text-[var(--ink-soft)] leading-relaxed">
+            <p className="measure mt-4 leading-relaxed text-[var(--ink-soft)]">
               Plus de devis perdus sur un coin d&apos;établi, plus de « je n&apos;avais pas dit oui pour ça ».
             </p>
 
-            <div className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-4">
+            <div className="mt-9 flex flex-wrap items-center gap-x-8 gap-y-4">
               <Link href="/register" className="action action--mark">
-                Ouvrir un dossier d&apos;essai
+                {PRIMARY_CTA}
               </Link>
               <Link href="#parcours" className="link-arrow">
                 Voir le parcours complet
@@ -121,13 +163,15 @@ function Ouverture() {
           {/* Fiche technique, comme l'en-tête d'un ordre de réparation. */}
           <dl className="rule-t md:col-span-5 md:col-start-8">
             {FICHE.map((row) => (
-              <div key={row.k} className="rule-b grid grid-cols-[9rem_1fr] gap-4 py-3.5">
+              <div key={row.k} className="rule-b grid grid-cols-[7rem_1fr] gap-4 py-3 sm:grid-cols-[9rem_1fr]">
                 <dt className="field-tag pt-0.5">{row.k}</dt>
                 <dd className="text-sm leading-snug">{row.v}</dd>
               </div>
             ))}
           </dl>
         </div>
+
+        <DossierStrip />
 
         {/* Sommaire du dossier */}
         <nav className="mt-20" aria-label="Sommaire">
@@ -188,6 +232,7 @@ function Dossier() {
           {/* Planche */}
           <figure className="order-1 min-w-0 md:order-2 md:col-span-7 md:col-start-6">
             <Board />
+            <p className="scroll-note field-tag field-tag--xs mt-3">Faites glisser la planche →</p>
             <figcaption className="field-tag rule-t mt-4 pt-3">
               Fig. 01 — Tableau d&apos;atelier, six véhicules en cours. Copie d&apos;écran de l&apos;application.
             </figcaption>
@@ -242,16 +287,16 @@ function Mark({ n }: { n: string }) {
 function Board() {
   return (
     <div className="scrollbar-thin overflow-x-auto">
-      <div className="min-w-[34rem] border border-[var(--rule-strong)] bg-[var(--paper-2)]">
+      <div className="min-w-[38rem] border border-[var(--rule-strong)] bg-[var(--paper-2)]">
         <div className="rule-b flex items-baseline justify-between gap-3 px-4 py-3">
           <span className="field-tag">Garage Normandie Auto</span>
-          <span className="tech text-[0.7rem] text-[var(--ink-soft)]">6 en cours · 1 en retard</span>
+          <span className="tech text-[0.75rem] text-[var(--ink-soft)]">6 en cours · 1 en retard</span>
         </div>
 
         <div className="grid grid-cols-4 gap-px bg-[var(--rule)]">
           {LANES.map((lane) => (
             <div key={lane.label} className="bg-[var(--paper)] p-2">
-              <p className="field-tag flex items-center gap-1.5 pb-2 text-[0.6rem]">
+              <p className="field-tag field-tag--xs flex items-center gap-1.5 pb-2">
                 {lane.mark && <Mark n={lane.mark} />}
                 <span className="truncate">{lane.label}</span>
               </p>
@@ -260,11 +305,11 @@ function Board() {
                   <article key={c.plate} className={`border bg-white p-2 ${c.late ? "border-[var(--mark)]" : "border-[var(--rule-strong)]"}`}>
                     <span className="flex items-center gap-1.5">
                       {c.markPlate && <Mark n={c.markPlate} />}
-                      <PlateFr value={c.plate} className="text-[0.62rem]" />
+                      <PlateFr value={c.plate} className="text-[0.7rem]" />
                     </span>
-                    <p className="mt-1.5 truncate text-[0.8rem] font-bold leading-tight text-[#14181d]">{c.model}</p>
-                    <p className="truncate text-[0.68rem] text-[#5b626b]">{c.customer}</p>
-                    <p className="tech mt-1.5 flex items-center justify-between gap-1 text-[0.6rem] text-[#5b626b]">
+                    <p className="mt-2 truncate text-[0.875rem] font-bold leading-tight text-[#14181d]">{c.model}</p>
+                    <p className="truncate text-[0.78rem] text-[#4b525b]">{c.customer}</p>
+                    <p className="tech mt-2 flex items-center justify-between gap-1 text-[0.7rem] text-[#4b525b]">
                       <span className="flex items-center gap-1">
                         {c.markTech && <Mark n={c.markTech} />}
                         {c.tech}
@@ -274,7 +319,7 @@ function Board() {
                         {c.time}
                       </span>
                     </p>
-                    <p className="mt-1.5 border-t border-[#d7d4cc] pt-1 text-[0.55rem] font-bold uppercase tracking-[0.1em] text-[#5b626b]">{c.status}</p>
+                    <p className="mt-2 border-t border-[#d7d4cc] pt-1.5 text-[0.625rem] font-bold uppercase tracking-[0.1em] text-[#4b525b]">{c.status}</p>
                   </article>
                 ))}
               </div>
@@ -295,22 +340,22 @@ const ETAPES = [
     h: "08:05",
     n: "01",
     t: "Réception",
-    d: "Client, véhicule, kilométrage, motif. Photos avant, arrière, côtés, intérieur, tableau de bord. Les rayures déjà là sont documentées avant que la voiture entre.",
+    d: "Client, véhicule, kilométrage, motif. Photos sous tous les angles : les rayures déjà là sont actées avant l’entrée.",
     inset: "plate" as const,
   },
-  { h: "08:20", n: "02", t: "Diagnostic", d: "Le technicien saisit ses constats, avec un niveau d'urgence et des photos. Rien n'est généré automatiquement : c'est son métier." },
-  { h: "09:10", n: "03", t: "Contrôle", d: "Dix-sept points : pneus, freins, moteur, visibilité, éclairage. Chacun reçoit un état et, si besoin, un commentaire et une photo." },
+  { h: "08:20", n: "02", t: "Diagnostic", d: "Le technicien saisit ses constats, avec un niveau d’urgence et des photos. Rien n’est généré automatiquement." },
+  { h: "09:10", n: "03", t: "Contrôle", d: "Dix-sept points imposés. Chacun reçoit un état, et si besoin un commentaire et une photo." },
   {
     h: "10:35",
     n: "04",
     t: "Proposition",
-    d: "Chaque intervention chiffrée : pièces, main-d'œuvre, TVA, total. Les montants sont calculés au centime, jamais en virgule flottante.",
+    d: "Pièces, main-d’œuvre, TVA, total. Les montants sont calculés au centime, jamais en virgule flottante.",
     inset: "prix" as const,
   },
-  { h: "10:50", n: "05", t: "Validation client", d: "Un lien personnel part au client. Sans compte, sans application. Il accepte, il refuse, ligne par ligne. Sa réponse est horodatée et verrouillée." },
+  { h: "10:50", n: "05", t: "Validation client", d: "Un lien personnel part au client. Il accepte ou refuse, ligne par ligne. Sa réponse est horodatée et verrouillée." },
   { h: "13:15", n: "06", t: "Réparation", d: "L'atelier ne voit que les lignes acceptées. Chacune est cochée quand elle est faite." },
-  { h: "16:40", n: "07", t: "Contrôle final", d: "Essai routier, niveaux, voyants, outils retirés, véhicule propre. Sans ce contrôle enregistré, le véhicule ne peut pas passer « prêt »." },
-  { h: "17:25", n: "08", t: "Restitution", d: "Travaux réalisés, travaux refusés, montant final, kilométrage de sortie. Le refus d'aujourd'hui devient l'argument du prochain passage." },
+  { h: "16:40", n: "07", t: "Contrôle final", d: "Essai routier, niveaux, voyants, outils retirés. Sans ce contrôle, le véhicule ne passe pas « prêt »." },
+  { h: "17:25", n: "08", t: "Restitution", d: "Travaux réalisés, refusés, montant final, kilométrage de sortie. Le refus d’aujourd’hui sert au prochain passage." },
 ];
 
 const STATUS_ORDER = Object.keys(STATUS_LABELS) as (keyof typeof STATUS_LABELS)[];
@@ -375,13 +420,14 @@ function Parcours() {
             <span>Échelle des statuts</span>
             <span>{STATUS_ORDER.length} positions</span>
           </p>
+          <p className="scroll-note field-tag field-tag--xs mt-3">Faites glisser l’échelle →</p>
           <div className="scrollbar-thin overflow-x-auto pt-5">
-            <ol className="grid min-w-[52rem] gap-px" style={{ gridTemplateColumns: `repeat(${STATUS_ORDER.length}, minmax(0, 1fr))` }}>
+            <ol className="grid min-w-[56rem] gap-px" style={{ gridTemplateColumns: `repeat(${STATUS_ORDER.length}, minmax(0, 1fr))` }}>
               {STATUS_ORDER.map((key, i) => (
                 <li key={key} className="relative pl-2">
                   <span className={`absolute left-0 top-0 h-3 w-px ${i === 0 ? "bg-[var(--mark)]" : "bg-[var(--rule-strong)]"}`} aria-hidden />
-                  <span className="tech block text-[0.65rem] text-[var(--ink-soft)]">{String(i + 1).padStart(2, "0")}</span>
-                  <span className="mt-1 block pr-2 text-[0.7rem] leading-tight">{STATUS_LABELS[key]}</span>
+                  <span className="tech block text-[0.6875rem] text-[var(--ink-soft)]">{String(i + 1).padStart(2, "0")}</span>
+                  <span className="mt-1 block pr-2 text-[0.75rem] leading-tight">{STATUS_LABELS[key]}</span>
                 </li>
               ))}
             </ol>
@@ -447,7 +493,7 @@ function Controle() {
                         <li key={item.key} className="leader py-1.5 text-sm">
                           <span>{item.label}</span>
                           <span className="leader__fill" aria-hidden />
-                          <span className={`tech text-[0.7rem] uppercase tracking-[0.08em] ${alerte ? "mark font-semibold" : "text-[var(--ink-soft)]"}`}>{etat}</span>
+                          <span className={`tech text-[0.75rem] uppercase tracking-[0.06em] ${alerte ? "mark font-semibold" : "text-[var(--ink-soft)]"}`}>{etat}</span>
                         </li>
                       );
                     })}
@@ -595,34 +641,52 @@ function Conditions() {
 
         <div className="mt-14 grid gap-12 md:grid-cols-12 md:gap-10">
           <div className="md:col-span-8">
-            <table className="ledger">
+            {/* Sous 640px, les lignes s'empilent en fiches ; les rôles ARIA
+                explicites conservent la sémantique de tableau. */}
+            <table className="ledger" role="table">
               <caption className="sr-only">Tarifs GarageFlow</caption>
-              <thead>
-                <tr className="field-tag">
-                  <th scope="col">Formule</th>
-                  <th scope="col">Comptes actifs</th>
-                  <th scope="col">Engagement</th>
-                  <th scope="col">Prix HT / mois</th>
+              <thead role="rowgroup">
+                <tr className="field-tag" role="row">
+                  <th scope="col" role="columnheader">
+                    Formule
+                  </th>
+                  <th scope="col" role="columnheader">
+                    Comptes actifs
+                  </th>
+                  <th scope="col" role="columnheader">
+                    Engagement
+                  </th>
+                  <th scope="col" role="columnheader">
+                    Prix HT / mois
+                  </th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody role="rowgroup">
                 {rows.map((r) => (
-                  <tr key={r.plan}>
-                    <th scope="row" className="display text-xl font-bold">
+                  <tr key={r.plan} role="row">
+                    <th scope="row" role="rowheader" className="display text-xl font-bold">
                       {r.plan}
                     </th>
-                    <td className="tech text-sm">{r.seats}</td>
-                    <td className="text-sm text-[var(--ink-soft)]">{r.commit}</td>
-                    <td className="tech whitespace-nowrap text-lg font-semibold">{r.price}</td>
+                    <td role="cell" className="tech text-sm">
+                      <span className="cell-tag field-tag field-tag--xs">Comptes</span>
+                      {r.seats}
+                    </td>
+                    <td role="cell" className="text-sm text-[var(--ink-soft)]">
+                      <span className="cell-tag field-tag field-tag--xs">Engagement</span>
+                      {r.commit}
+                    </td>
+                    <td role="cell" className="tech whitespace-nowrap text-lg font-semibold">
+                      <span className="cell-tag field-tag field-tag--xs">Prix HT / mois</span>
+                      {r.price}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
 
-            <p className="mt-8">
-              <Link href="/register" className="link-arrow">
-                Démarrer l&apos;essai
-                <span aria-hidden>→</span>
+            <p className="mt-9">
+              <Link href="/register" className="action action--mark">
+                {PRIMARY_CTA}
               </Link>
             </p>
           </div>
@@ -664,7 +728,7 @@ function Annexe() {
           <h2 className="display display-l mt-3">Questions posées en atelier</h2>
         </div>
 
-        <div className="mt-12 md:columns-2 md:gap-14">
+        <div className="mt-14 md:columns-2 md:gap-14">
           {QUESTIONS.map((item, i) => (
             <article key={item.q} className="mb-9 break-inside-avoid">
               <p className="tech text-xs text-[var(--ink-soft)]">Q.{String(i + 1).padStart(2, "0")}</p>
@@ -684,7 +748,7 @@ function Annexe() {
 
 function Cloture() {
   return (
-    <section className="pb-8 pt-10">
+    <section className="pb-16 pt-12 sm:pb-20 sm:pt-16">
       <Shell>
         <div className="rule-heavy grid gap-10 pt-5 md:grid-cols-12 md:gap-10">
           <div className="md:col-span-7">
@@ -697,7 +761,7 @@ function Cloture() {
             </p>
             <p className="mt-9">
               <Link href="/register" className="action action--mark">
-                Créer mon garage
+                {PRIMARY_CTA}
               </Link>
             </p>
           </div>

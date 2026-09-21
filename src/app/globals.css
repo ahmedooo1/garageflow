@@ -342,7 +342,7 @@ button {
   --paper: #f4f3f0;
   --paper-2: #eae8e2;
   --ink: #14181d;
-  --ink-soft: #5b626b;
+  --ink-soft: #4b525b;
   --rule: #d7d4cc;
   --rule-strong: #b3afa5;
   --mark: #d2510c;
@@ -358,7 +358,7 @@ button {
   --paper: #161c24;
   --paper-2: #1e242d;
   --ink: #f2f1ee;
-  --ink-soft: #98a1ad;
+  --ink-soft: #a7b1bd;
   --rule: #2e3742;
   --rule-strong: #49545f;
 
@@ -382,11 +382,17 @@ button {
 /* Étiquette de champ, comme sur un bon de travail. */
 .field-tag {
   font-family: var(--font-tech), ui-monospace, monospace;
-  font-size: 0.6875rem;
-  line-height: 1.2;
-  letter-spacing: 0.16em;
+  font-size: 0.75rem;
+  line-height: 1.25;
+  letter-spacing: 0.13em;
   text-transform: uppercase;
   color: var(--ink-soft);
+}
+
+/* Variante dense : planches, legendes, en-tetes de colonnes serres. */
+.field-tag--xs {
+  font-size: 0.6875rem;
+  letter-spacing: 0.12em;
 }
 
 /* Titraille élargie, proche de la signalétique d'atelier. */
@@ -452,9 +458,10 @@ button {
 .mark-rule {
   background-image: linear-gradient(var(--mark), var(--mark));
   background-repeat: no-repeat;
-  background-size: 100% 0.14em;
-  background-position: 0 100%;
-  padding-bottom: 0.06em;
+  background-size: 100% 0.1em;
+  background-position: 0 calc(100% - 0.1em);
+  /* Le trait reste d'un seul tenant : il ne doit jamais se couper en deux. */
+  white-space: nowrap;
 }
 
 /* Tampon d'atelier. */
@@ -616,4 +623,55 @@ button {
   height: 1.05rem;
   font-size: 0.5rem;
   flex: 0 0 auto;
+}
+
+/* Tableau de tarifs : lignes empilees sous 640px, semantique preservee par
+   les roles ARIA explicites poses dans le balisage. */
+.cell-tag {
+  display: none;
+}
+
+@media (max-width: 639px) {
+  .ledger thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .ledger tbody tr {
+    display: block;
+    border-top: 1px solid var(--rule);
+    padding: 1.1rem 0;
+  }
+  .ledger tbody tr:first-child {
+    border-top: 2px solid var(--ink);
+  }
+  .ledger tbody th,
+  .ledger tbody td {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    border: 0;
+    padding: 0.3rem 0;
+    text-align: left;
+  }
+  .ledger tbody td:last-child {
+    text-align: left;
+  }
+  .cell-tag {
+    display: inline;
+  }
+}
+
+/* Mention de defilement sur les planches larges, mobile uniquement. */
+.scroll-note {
+  display: none;
+}
+@media (max-width: 767px) {
+  .scroll-note {
+    display: block;
+  }
 }
