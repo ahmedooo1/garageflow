@@ -14,6 +14,7 @@ export type SessionUser = {
   firstName: string;
   lastName: string;
   role: Role;
+  platformAdmin: boolean;
   garageName: string;
 };
 
@@ -75,6 +76,7 @@ export const getSession = cache(async (): Promise<SessionInfo | null> => {
       firstName: u.firstName,
       lastName: u.lastName,
       role: u.role,
+      platformAdmin: u.platformAdmin,
       garageName: u.garage.name,
     },
   };

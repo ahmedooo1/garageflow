@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import sharp from "sharp";
 import type { Ctx } from "@/server/context";
-import { prisma } from "@/server/db";
 import { registerGarage } from "@/server/services/auth";
+import { purgeGarage } from "@/server/services/garage-lifecycle";
 import { createUser } from "@/server/services/users";
 
 export const PASSWORD = "Test-Password-123!";
@@ -42,7 +42,7 @@ export async function createTestGarage(label = "Garage"): Promise<TestGarage> {
 }
 
 export async function cleanupGarage(garageId: string): Promise<void> {
-  await prisma.garage.delete({ where: { id: garageId } }).catch(() => undefined);
+  await purgeGarage(garageId);
 }
 
 export async function jpegFixture(label = "TEST"): Promise<Buffer> {

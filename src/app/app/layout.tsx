@@ -1,11 +1,12 @@
 import { AppNav, MobileNav } from "@/components/app-nav";
 import { Logo } from "@/components/logo";
 import { LogoutButton } from "@/components/logout-button";
+import { SubscriptionBanner } from "@/components/subscription-banner";
 import { ROLE_LABELS } from "@/lib/rbac";
 import { requireUser } from "@/server/context";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const { user } = await requireUser();
+  const { user, access } = await requireUser();
   return (
     <div className="flex min-h-dvh">
       <aside className="hidden w-64 shrink-0 flex-col bg-steel-900 px-4 py-5 text-white lg:flex">
@@ -13,7 +14,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <Logo light />
         </div>
         <p className="mt-6 mb-2 truncate px-3 text-xs font-bold uppercase tracking-wider text-steel-300">{user.garageName}</p>
-        <AppNav role={user.role} />
+        <AppNav role={user.role} platformAdmin={user.platformAdmin} canWrite={access.canWrite} />
         <div className="mt-auto rounded-[10px] bg-steel-800 p-3">
           <p className="truncate text-sm font-bold">
             {user.firstName} {user.lastName}
@@ -30,8 +31,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <LogoutButton compact />
           </div>
         </header>
+        <SubscriptionBanner access={access} role={user.role} />
         <main className="flex-1 px-4 pb-24 pt-5 sm:px-6 lg:px-8 lg:pb-8">{children}</main>
-        <MobileNav role={user.role} />
+        <MobileNav role={user.role} canWrite={access.canWrite} />
       </div>
     </div>
   );

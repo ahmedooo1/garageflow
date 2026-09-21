@@ -134,8 +134,14 @@ function LinkPanel({ link }: { link: SendResult }) {
   const [copied, setCopied] = useState(false);
   return (
     <Alert tone="info">
-      <p className="font-bold">Lien de validation généré (valable jusqu&apos;au {formatDateTime(link.expiresAt)}).</p>
-      <p className="text-xs">Transmettez-le au client par SMS ou email. Il n&apos;est affiché qu&apos;une seule fois : régénérez-le si besoin.</p>
+      <p className="font-bold">
+        {link.emailed ? "Lien de validation envoyé au client par email" : "Lien de validation généré"} (valable jusqu&apos;au {formatDateTime(link.expiresAt)}).
+      </p>
+      <p className="text-xs">
+        {link.emailed
+          ? "Vous pouvez aussi le transmettre par SMS. Il n’est affiché qu’une seule fois : régénérez-le si besoin."
+          : "Aucun email client renseigné : transmettez ce lien par SMS ou de vive voix. Il n’est affiché qu’une seule fois."}
+      </p>
       <div className="mt-2 flex flex-col gap-2 sm:flex-row">
         <input readOnly value={link.url} className="input min-h-10 flex-1 font-mono text-xs" data-testid="approval-link" onFocus={(e) => e.currentTarget.select()} />
         <button

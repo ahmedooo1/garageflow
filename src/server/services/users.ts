@@ -6,6 +6,7 @@ import { AppError, ConflictError, NotFoundError } from "@/server/lib/errors";
 import { hashPassword } from "@/server/lib/password";
 import { emailField, parseOrThrow, passwordField, requiredText } from "@/server/lib/validation";
 import { audit } from "./audit";
+import { assertSeatAvailable } from "./billing";
 
 export const createUserSchema = z.object({
   firstName: requiredText("Prénom", 80),
@@ -38,6 +39,7 @@ export async function createUser(ctx: Ctx, input: CreateUserInput) {
   const data = parseOrThrow(createUserSchema, input);
   const existing = await prisma.user.findUnique({ where: { email: data.email }, select: { id: true } });
   if (existing) throw new ConflictError("Un compte existe déjà avec cet email");
+  await assertSeatAvailable(ctx.garageId);
   const user = await prisma.user.create({
     data: {
       garageId: ctx.garageId,
@@ -68,6 +70,7 @@ export async function setUserActive(ctx: Ctx, userId: string, active: boolean) {
   const target = await prisma.user.findFirst({ where: { id: userId, garageId: ctx.garageId }, select: { id: true } });
   if (!target) throw new NotFoundError("Utilisateur introuvable");
   if (target.id === ctx.userId) throw new AppError("Vous ne pouvez pas désactiver votre propre compte");
+  if (active) await assertSeatAvailable(ctx.garageId);
   await prisma.user.update({ where: { id: userId }, data: { active } });
   if (!active) await prisma.session.deleteMany({ where: { userId } });
   await audit({ garageId: ctx.garageId, userId: ctx.userId, action: active ? "user.activate" : "user.deactivate", entityType: "User", entityId: userId, ip: ctx.ip });

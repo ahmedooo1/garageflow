@@ -11,6 +11,19 @@ datasource db {
 // Tenancy & auth
 // ---------------------------------------------------------------------------
 
+enum Plan {
+  ATELIER
+  RESEAU
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  SUSPENDED
+}
+
 model Garage {
   id           String   @id @default(cuid())
   name         String
@@ -22,6 +35,17 @@ model Garage {
   workOrderSeq Int      @default(0)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  // --- Abonnement (SaaS) ---------------------------------------------------
+  plan                 Plan               @default(ATELIER)
+  subscriptionStatus   SubscriptionStatus @default(TRIALING)
+  trialEndsAt          DateTime           @default(now())
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean            @default(false)
+  stripeCustomerId     String?            @unique
+  stripeSubscriptionId String?            @unique
+  suspendedAt          DateTime?
+  suspendedReason      String             @default("")
 
   users      User[]
   customers  Customer[]
@@ -52,6 +76,8 @@ model User {
   lastName     String
   role         Role     @default(TECHNICIAN)
   active       Boolean  @default(true)
+  /// Accès à la console plateforme (/admin). Hors périmètre du garage.
+  platformAdmin Boolean @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

@@ -331,3 +331,93 @@ button {
   background: var(--color-line-strong);
   border-radius: 8px;
 }
+
+/* ------------------------------------------------------------------------- */
+/* Site public : atelier sombre, trame d'établi, révélations au défilement     */
+/* ------------------------------------------------------------------------- */
+
+/* Trame technique discrète, façon plan d'atelier. */
+.shop-grid {
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 56px 56px;
+}
+
+/* Halo orange derrière le contenu principal. */
+.shop-glow::before {
+  content: "";
+  position: absolute;
+  inset: -20% 30% 40% -10%;
+  background: radial-gradient(60% 55% at 30% 40%, rgba(226, 89, 15, 0.28), transparent 70%);
+  filter: blur(40px);
+  pointer-events: none;
+}
+
+/* Bande diagonale de sécurité (séparateur de sections). */
+.hazard-stripe {
+  height: 6px;
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--color-accent) 0 14px,
+    #161c24 14px 28px
+  );
+}
+
+/* Le contenu est visible par défaut ; l'animation n'est qu'un enrichissement. */
+.reveal {
+  opacity: 1;
+}
+
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .reveal {
+      animation: reveal-in linear both;
+      animation-timeline: view();
+      animation-range: entry 5% cover 28%;
+    }
+  }
+}
+
+@keyframes reveal-in {
+  from {
+    opacity: 0;
+    transform: translateY(26px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .float-slow {
+    animation: float-slow 7s ease-in-out infinite;
+  }
+}
+
+@keyframes float-slow {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+/* Maquette d'écran réutilisée dans la page d'accueil. */
+.mock-card {
+  background: var(--color-surface);
+  border-radius: 10px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  color: var(--color-ink);
+  position: relative;
+  overflow: hidden;
+}
+.section-title {
+  font-size: clamp(1.75rem, 1.2rem + 2vw, 2.75rem);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+}

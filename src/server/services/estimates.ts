@@ -1,12 +1,14 @@
 import { Urgency, type Prisma } from "@prisma/client";
 import { z } from "zod";
-import { computeLine, computeTotals, formatEur, parseMoneyInput } from "@/lib/pricing";
+import { formatPlate } from "@/lib/format";
+import { computeLine, computeTotals, formatEur, money, parseMoneyInput } from "@/lib/pricing";
 import { prisma, type Tx } from "@/server/db";
 import { assertPermission, type Ctx } from "@/server/context";
 import { AppError, ConflictError, NotFoundError } from "@/server/lib/errors";
 import { generateToken, sha256 } from "@/server/lib/crypto";
 import { optionalId, optionalText, parseOrThrow, requiredText } from "@/server/lib/validation";
 import { audit } from "./audit";
+import { sendApprovalEmail } from "./emails";
 import { addEvent } from "./timeline";
 import { assertEditable, getOwnedWorkOrder, transitionStatus } from "./workorders";
 
@@ -135,6 +137,43 @@ export function approvalUrl(appUrl: string, token: string): string {
   return `${appUrl.replace(/\/$/, "")}/validation/${token}`;
 }
 
+/**
+ * Envoie le lien de validation au client par email quand son adresse est
+ * connue. L'échec d'envoi n'annule jamais la génération du lien : le garage
+ * peut toujours le transmettre par SMS ou de vive voix.
+ */
+async function mailApprovalLink(estimateId: string, url: string, expiresAt: Date): Promise<boolean> {
+  const estimate = await prisma.estimate.findUnique({
+    where: { id: estimateId },
+    include: {
+      lines: { select: { totalTtc: true } },
+      workOrder: {
+        select: {
+          garage: { select: { name: true, phone: true } },
+          customer: { select: { firstName: true, lastName: true, email: true } },
+          vehicle: { select: { make: true, model: true, plate: true } },
+        },
+      },
+    },
+  });
+  if (!estimate) return false;
+  const { customer, vehicle, garage } = estimate.workOrder;
+  if (!customer.email) return false;
+  const total = estimate.lines.reduce((sum, l) => sum.plus(l.totalTtc.toString()), money(0));
+  return sendApprovalEmail({
+    to: customer.email,
+    customerName: `${customer.firstName} ${customer.lastName}`,
+    garageName: garage.name,
+    garagePhone: garage.phone,
+    vehicle: `${vehicle.make} ${vehicle.model}`,
+    plate: formatPlate(vehicle.plate),
+    totalTtc: total.toFixed(2),
+    lineCount: estimate.lines.length,
+    url,
+    expiresAt,
+  });
+}
+
 /** Envoie le brouillon au client : verrouille l'estimation et génère le lien sécurisé. */
 export async function sendEstimate(ctx: Ctx, workOrderId: string, appUrl: string) {
   assertPermission(ctx, "estimate:send");
@@ -144,7 +183,7 @@ export async function sendEstimate(ctx: Ctx, workOrderId: string, appUrl: string
   if (!draft) throw new AppError("Aucune estimation en brouillon");
   if (draft.lines.length === 0) throw new AppError("Ajoutez au moins une ligne de travaux avant l'envoi");
 
-  return prisma.$transaction(async (tx) => {
+  const sent = await prisma.$transaction(async (tx) => {
     // Une seule estimation « SENT » à la fois : les précédentes deviennent obsolètes.
     const previous = await tx.estimate.findMany({ where: { workOrderId, status: "SENT" }, select: { id: true } });
     for (const p of previous) {
@@ -170,6 +209,8 @@ export async function sendEstimate(ctx: Ctx, workOrderId: string, appUrl: string
     await audit({ garageId: ctx.garageId, userId: ctx.userId, action: "estimate.send", entityType: "Estimate", entityId: draft.id, ip: ctx.ip, metadata: { version: draft.version } }, tx);
     return { estimateId: draft.id, token, expiresAt, url: approvalUrl(appUrl, token) };
   });
+  const emailed = await mailApprovalLink(sent.estimateId, sent.url, sent.expiresAt);
+  return { ...sent, emailed };
 }
 
 /** Génère un nouveau lien (révoque les précédents) pour une estimation envoyée. */
@@ -178,11 +219,13 @@ export async function regenerateLink(ctx: Ctx, estimateId: string, appUrl: strin
   const estimate = await prisma.estimate.findFirst({ where: { id: estimateId, garageId: ctx.garageId } });
   if (!estimate) throw new NotFoundError("Estimation introuvable");
   if (estimate.status !== "SENT") throw new ConflictError("Seule une estimation en attente de décision peut recevoir un nouveau lien");
-  return prisma.$transaction(async (tx) => {
+  const issued = await prisma.$transaction(async (tx) => {
     const { token, expiresAt } = await issueToken(tx, estimateId, ctx.userId);
     await audit({ garageId: ctx.garageId, userId: ctx.userId, action: "estimate.link_regenerated", entityType: "Estimate", entityId: estimateId, ip: ctx.ip }, tx);
     return { token, expiresAt, url: approvalUrl(appUrl, token) };
   });
+  const emailed = await mailApprovalLink(estimateId, issued.url, issued.expiresAt);
+  return { ...issued, emailed };
 }
 
 /**

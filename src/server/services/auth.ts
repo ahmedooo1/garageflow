@@ -2,10 +2,12 @@ import { z } from "zod";
 import { prisma } from "@/server/db";
 import { generateToken, sha256 } from "@/server/lib/crypto";
 import { AppError, ConflictError, UnauthorizedError } from "@/server/lib/errors";
-import { sendMail } from "@/server/lib/mailer";
+import { getAppUrl } from "@/server/lib/request";
 import { DUMMY_HASH, hashPassword, verifyPassword } from "@/server/lib/password";
 import { emailField, parseOrThrow, passwordField, requiredText } from "@/server/lib/validation";
 import { audit } from "./audit";
+import { trialEndDate } from "./billing";
+import { sendPasswordResetEmail, sendWelcomeEmail } from "./emails";
 
 export const registerSchema = z.object({
   garageName: requiredText("Nom du garage", 120),
@@ -19,14 +21,17 @@ export const registerSchema = z.object({
 export type RegisterInput = z.input<typeof registerSchema>;
 
 /** Crée un garage et son premier utilisateur (OWNER). */
-export async function registerGarage(input: RegisterInput, meta: { ip?: string } = {}) {
+export async function registerGarage(input: RegisterInput, meta: { ip?: string; appUrl?: string } = {}) {
   const data = parseOrThrow(registerSchema, input);
   const existing = await prisma.user.findUnique({ where: { email: data.email }, select: { id: true } });
   if (existing) throw new ConflictError("Un compte existe déjà avec cet email");
 
   const passwordHash = await hashPassword(data.password);
+  const trialEndsAt = trialEndDate();
   const result = await prisma.$transaction(async (tx) => {
-    const garage = await tx.garage.create({ data: { name: data.garageName, phone: data.phone } });
+    const garage = await tx.garage.create({
+      data: { name: data.garageName, phone: data.phone, trialEndsAt, subscriptionStatus: "TRIALING", plan: "ATELIER" },
+    });
     const user = await tx.user.create({
       data: {
         garageId: garage.id,
@@ -42,6 +47,13 @@ export async function registerGarage(input: RegisterInput, meta: { ip?: string }
       tx,
     );
     return { garage, user };
+  });
+  await sendWelcomeEmail({
+    to: result.user.email,
+    firstName: result.user.firstName,
+    garageName: result.garage.name,
+    trialEndsAt,
+    appUrl: meta.appUrl ?? getAppUrl(),
   });
   return result;
 }
@@ -78,11 +90,7 @@ export async function requestPasswordReset(emailRaw: string, appUrl: string, met
     data: { userId: user.id, tokenHash: sha256(token), expiresAt: new Date(Date.now() + RESET_TTL_MS) },
   });
   await audit({ garageId: user.garageId, userId: user.id, action: "auth.reset_requested", entityType: "User", entityId: user.id, ip: meta.ip });
-  await sendMail({
-    to: email,
-    subject: "GarageFlow : réinitialisation de votre mot de passe",
-    text: `Pour choisir un nouveau mot de passe, ouvrez ce lien (valable 1 heure) :\n${appUrl}/reset-password/${token}`,
-  });
+  await sendPasswordResetEmail({ to: email, url: `${appUrl}/reset-password/${token}` });
 }
 
 export async function resetPassword(token: string, newPassword: string, meta: { ip?: string } = {}): Promise<void> {

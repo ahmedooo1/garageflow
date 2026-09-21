@@ -47,6 +47,14 @@ export class ConflictError extends AppError {
   }
 }
 
+/** Abonnement absent, expiré ou suspendu : l'écriture est bloquée. */
+export class SubscriptionError extends AppError {
+  constructor(message = "Votre abonnement ne permet plus cette action") {
+    super(message, 402, "SUBSCRIPTION_REQUIRED");
+    this.name = "SubscriptionError";
+  }
+}
+
 export class RateLimitError extends AppError {
   constructor(message = "Trop de tentatives, réessayez dans quelques minutes") {
     super(message, 429, "RATE_LIMITED");

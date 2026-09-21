@@ -2,7 +2,7 @@ import { afterAll, describe, expect, it, vi } from "vitest";
 import { prisma } from "@/server/db";
 import { sha256 } from "@/server/lib/crypto";
 import { ConflictError, RateLimitError, UnauthorizedError, ValidationError } from "@/server/lib/errors";
-import * as mailer from "@/server/lib/mailer";
+import * as emails from "@/server/services/emails";
 import { enforceRateLimit, RATE_LIMITS } from "@/server/lib/rate-limit";
 import { authenticate, registerGarage, requestPasswordReset, resetPassword } from "@/server/services/auth";
 import { cleanupGarage, createTestGarage, PASSWORD } from "./helpers";
@@ -56,10 +56,10 @@ describe("authentification", () => {
     const g = await createTestGarage("Auth5");
     created.push(g.garageId);
     await prisma.session.create({ data: { userId: g.owner.userId, tokenHash: sha256("old-session"), expiresAt: new Date(Date.now() + 60_000) } });
-    const spy = vi.spyOn(mailer, "sendMail").mockResolvedValue();
+    const spy = vi.spyOn(emails, "sendPasswordResetEmail").mockResolvedValue();
     await requestPasswordReset(g.ownerEmail, "http://localhost:3000");
     expect(spy).toHaveBeenCalledTimes(1);
-    const token = spy.mock.calls[0][0].text.match(/reset-password\/([A-Za-z0-9_-]+)/)?.[1];
+    const token = spy.mock.calls[0][0].url.match(/reset-password\/([A-Za-z0-9_-]+)/)?.[1];
     expect(token).toBeTruthy();
     // Email inconnu : aucune fuite, aucun mail.
     await requestPasswordReset("nobody@test.local", "http://localhost:3000");

@@ -10,6 +10,7 @@ import { addDamage } from "@/server/services/damages";
 import { addLine, sendEstimate } from "@/server/services/estimates";
 import { addFinding } from "@/server/services/findings";
 import { addPhoto } from "@/server/services/photos";
+import { purgeGarage } from "@/server/services/garage-lifecycle";
 import { createVehicle } from "@/server/services/vehicles";
 import { applyAction, createWorkOrder, deliverVehicle, saveFinalCheck } from "@/server/services/workorders";
 
@@ -49,7 +50,7 @@ async function main() {
   const existing = await prisma.user.findUnique({ where: { email: DEMO_OWNER_EMAIL }, select: { garageId: true } });
   if (existing) {
     console.log("Suppression du garage démo existant…");
-    await prisma.garage.delete({ where: { id: existing.garageId } });
+    await purgeGarage(existing.garageId);
   }
 
   const passwordHash = await hashPassword(DEMO_PASSWORD);
@@ -60,9 +61,14 @@ async function main() {
       phone: "02 31 00 00 00",
       email: "contact@normandie-auto.fr",
       siret: "812 345 678 00019",
+      // Le garage de démonstration est activé pour 12 mois (pas d'essai qui expire).
+      plan: "ATELIER",
+      subscriptionStatus: "ACTIVE",
+      trialEndsAt: inDays(14),
+      currentPeriodEnd: inDays(365),
       users: {
         create: [
-          { email: DEMO_OWNER_EMAIL, passwordHash, firstName: "Philippe", lastName: "Lemaire", role: "OWNER" },
+          { email: DEMO_OWNER_EMAIL, passwordHash, firstName: "Philippe", lastName: "Lemaire", role: "OWNER", platformAdmin: true },
           { email: "claire@normandie-auto.fr", passwordHash, firstName: "Claire", lastName: "Dubois", role: "RECEPTION" },
           { email: "karim@normandie-auto.fr", passwordHash, firstName: "Karim", lastName: "Benali", role: "TECHNICIAN" },
           { email: "julien@normandie-auto.fr", passwordHash, firstName: "Julien", lastName: "Morel", role: "TECHNICIAN" },
@@ -284,7 +290,7 @@ async function main() {
     photos: await prisma.photo.count({ where: { garageId: garage.id } }),
   };
   console.log("Seed terminé :", counts);
-  console.log(`Connexion : ${DEMO_OWNER_EMAIL} / ${DEMO_PASSWORD} (gérant)`);
+  console.log(`Connexion : ${DEMO_OWNER_EMAIL} / ${DEMO_PASSWORD} (gérant + console plateforme /admin)`);
   console.log(`            claire@normandie-auto.fr (réception), karim@ / julien@normandie-auto.fr (techniciens), même mot de passe`);
 }
 

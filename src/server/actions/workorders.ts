@@ -179,7 +179,7 @@ export async function removeEstimateLineAction(_prev: ActionState, form: FormDat
   return result;
 }
 
-export type SendResult = { url: string; expiresAt: string };
+export type SendResult = { url: string; expiresAt: string; emailed: boolean };
 
 export async function sendEstimateAction(_prev: ActionState<SendResult>, form: FormData): Promise<ActionState<SendResult>> {
   const id = str(form, "workOrderId");
@@ -187,7 +187,7 @@ export async function sendEstimateAction(_prev: ActionState<SendResult>, form: F
     const { ctx } = await requireCtx("estimate:send");
     ctx.ip = await getClientIp();
     const sent = await sendEstimate(ctx, id, getAppUrl());
-    return { url: sent.url, expiresAt: sent.expiresAt.toISOString() };
+    return { url: sent.url, expiresAt: sent.expiresAt.toISOString(), emailed: sent.emailed };
   });
   if (result.ok) refresh(id);
   return result;
@@ -199,7 +199,7 @@ export async function regenerateLinkAction(_prev: ActionState<SendResult>, form:
     const { ctx } = await requireCtx("estimate:send");
     ctx.ip = await getClientIp();
     const sent = await regenerateLink(ctx, str(form, "estimateId"), getAppUrl());
-    return { url: sent.url, expiresAt: sent.expiresAt.toISOString() };
+    return { url: sent.url, expiresAt: sent.expiresAt.toISOString(), emailed: sent.emailed };
   });
   if (result.ok) refresh(id);
   return result;
