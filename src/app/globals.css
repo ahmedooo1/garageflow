@@ -332,92 +332,288 @@ button {
   border-radius: 8px;
 }
 
-/* ------------------------------------------------------------------------- */
-/* Site public : atelier sombre, trame d'établi, révélations au défilement     */
-/* ------------------------------------------------------------------------- */
 
-/* Trame technique discrète, façon plan d'atelier. */
-.shop-grid {
-  background-image:
-    linear-gradient(to right, rgba(255, 255, 255, 0.045) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
-  background-size: 56px 56px;
+/* ========================================================================== */
+/* Site public — direction artistique « dossier d'atelier »                    */
+/* Papier, filets, réglures, numéros. Aucune ombre, aucun arrondi décoratif.   */
+/* ========================================================================== */
+
+.public {
+  --paper: #f4f3f0;
+  --paper-2: #eae8e2;
+  --ink: #14181d;
+  --ink-soft: #5b626b;
+  --rule: #d7d4cc;
+  --rule-strong: #b3afa5;
+  --mark: #d2510c;
+
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  font-synthesis-weight: none;
 }
 
-/* Halo orange derrière le contenu principal. */
-.shop-glow::before {
-  content: "";
-  position: absolute;
-  inset: -20% 30% 40% -10%;
-  background: radial-gradient(60% 55% at 30% 40%, rgba(226, 89, 15, 0.28), transparent 70%);
-  filter: blur(40px);
-  pointer-events: none;
+/* Bloc inversé : mêmes règles, encre claire sur acier. */
+.public-dark {
+  --paper: #161c24;
+  --paper-2: #1e242d;
+  --ink: #f2f1ee;
+  --ink-soft: #98a1ad;
+  --rule: #2e3742;
+  --rule-strong: #49545f;
+
+  background: var(--paper);
+  color: var(--ink);
 }
 
-/* Bande diagonale de sécurité (séparateur de sections). */
-.hazard-stripe {
-  height: 6px;
-  background: repeating-linear-gradient(
-    -45deg,
-    var(--color-accent) 0 14px,
-    #161c24 14px 28px
-  );
+.public a:focus-visible,
+.public button:focus-visible {
+  outline: 2px solid var(--mark);
+  outline-offset: 3px;
 }
 
-/* Le contenu est visible par défaut ; l'animation n'est qu'un enrichissement. */
-.reveal {
-  opacity: 1;
+/* --- Typographie --------------------------------------------------------- */
+
+.tech {
+  font-family: var(--font-tech), ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
 }
 
-@supports (animation-timeline: view()) {
-  @media (prefers-reduced-motion: no-preference) {
-    .reveal {
-      animation: reveal-in linear both;
-      animation-timeline: view();
-      animation-range: entry 5% cover 28%;
-    }
-  }
+/* Étiquette de champ, comme sur un bon de travail. */
+.field-tag {
+  font-family: var(--font-tech), ui-monospace, monospace;
+  font-size: 0.6875rem;
+  line-height: 1.2;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
 }
 
-@keyframes reveal-in {
-  from {
-    opacity: 0;
-    transform: translateY(26px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
+/* Titraille élargie, proche de la signalétique d'atelier. */
+.display {
+  font-weight: 700;
+  font-stretch: 115%;
+  letter-spacing: -0.022em;
+  line-height: 0.97;
+  text-wrap: balance;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .float-slow {
-    animation: float-slow 7s ease-in-out infinite;
-  }
+.display-xl {
+  font-size: clamp(2.6rem, 1.1rem + 6vw, 6rem);
+}
+.display-l {
+  font-size: clamp(1.9rem, 1.1rem + 3vw, 3.4rem);
+}
+.display-m {
+  font-size: clamp(1.25rem, 1rem + 1vw, 1.75rem);
 }
 
-@keyframes float-slow {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-10px);
-  }
+.measure {
+  max-width: 62ch;
+}
+.measure-tight {
+  max-width: 46ch;
 }
 
-/* Maquette d'écran réutilisée dans la page d'accueil. */
-.mock-card {
-  background: var(--color-surface);
-  border-radius: 10px;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
-  color: var(--color-ink);
-  position: relative;
+/* --- Filets techniques --------------------------------------------------- */
+
+.rule-t {
+  border-top: 1px solid var(--rule);
+}
+.rule-b {
+  border-bottom: 1px solid var(--rule);
+}
+.rule-l {
+  border-left: 1px solid var(--rule);
+}
+.rule-heavy {
+  border-top: 2px solid var(--ink);
+}
+
+/* Ligne de conduite pointillée des feuilles de contrôle. */
+.leader {
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+}
+.leader__fill {
+  flex: 1 1 auto;
+  border-bottom: 1px dotted var(--rule-strong);
+  transform: translateY(-0.3em);
+}
+
+/* --- Marques ------------------------------------------------------------- */
+
+.mark {
+  color: var(--mark);
+}
+
+/* Soulignement au marqueur : un seul emploi de couleur par page. */
+.mark-rule {
+  background-image: linear-gradient(var(--mark), var(--mark));
+  background-repeat: no-repeat;
+  background-size: 100% 0.14em;
+  background-position: 0 100%;
+  padding-bottom: 0.06em;
+}
+
+/* Tampon d'atelier. */
+.stamp {
+  display: inline-block;
+  border: 2px solid var(--mark);
+  color: var(--mark);
+  padding: 0.45rem 0.9rem;
+  transform: rotate(-3.5deg);
+  font-family: var(--font-tech), monospace;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+}
+
+/* Repère numéroté posé sur une planche. */
+.callout {
+  display: grid;
+  place-items: center;
+  width: 1.375rem;
+  height: 1.375rem;
+  border: 1px solid var(--mark);
+  background: var(--mark);
+  color: #fff;
+  font-family: var(--font-tech), monospace;
+  font-size: 0.625rem;
+  font-weight: 600;
+}
+
+/* --- Plaque d'immatriculation française ---------------------------------- */
+
+.plate-fr {
+  display: inline-flex;
+  align-items: stretch;
+  border: 2px solid #12151a;
+  border-radius: 3px;
+  background: #fff;
   overflow: hidden;
+  line-height: 1;
 }
-.section-title {
-  font-size: clamp(1.75rem, 1.2rem + 2vw, 2.75rem);
-  font-weight: 800;
-  letter-spacing: -0.025em;
-  line-height: 1.1;
+.plate-fr__band {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1em;
+  background: #04338c;
+  color: #fff;
+  padding: 0.28em 0.32em;
+  font-family: var(--font-tech), monospace;
+  font-size: 0.58em;
+  font-weight: 600;
+}
+.plate-fr__stars {
+  font-size: 0.7em;
+  opacity: 0.85;
+  letter-spacing: -0.05em;
+}
+.plate-fr__no {
+  display: flex;
+  align-items: center;
+  padding: 0.3em 0.55em;
+  font-family: var(--font-tech), monospace;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: #12151a;
+  white-space: nowrap;
+}
+
+/* --- Liens ---------------------------------------------------------------- */
+
+.link-arrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--ink);
+  font-weight: 600;
+  border-bottom: 2px solid var(--mark);
+  padding-bottom: 0.15rem;
+  transition: color 120ms;
+}
+.link-arrow:hover {
+  color: var(--mark);
+}
+
+/* Bouton unique du site : rectangle plein, sans arrondi ni ombre. */
+.action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  min-height: 3.25rem;
+  padding: 0 1.5rem;
+  background: var(--ink);
+  color: var(--paper);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  border: 2px solid var(--ink);
+  transition: background-color 120ms, color 120ms;
+}
+.action:hover {
+  background: var(--mark);
+  border-color: var(--mark);
+  color: #fff;
+}
+.action--mark {
+  background: var(--mark);
+  border-color: var(--mark);
+  color: #fff;
+}
+.action--mark:hover {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+.action--ghost {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--rule-strong);
+}
+.action--ghost:hover {
+  background: transparent;
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+/* --- Tableau de tarifs ---------------------------------------------------- */
+
+.ledger {
+  width: 100%;
+  border-collapse: collapse;
+}
+.ledger th,
+.ledger td {
+  border-top: 1px solid var(--rule);
+  padding: 1.15rem 0.75rem;
+  text-align: left;
+  vertical-align: baseline;
+}
+.ledger thead th {
+  border-top: none;
+  border-bottom: 2px solid var(--ink);
+  padding-block: 0.5rem 0.65rem;
+}
+.ledger td:first-child,
+.ledger th:first-child {
+  padding-left: 0;
+}
+.ledger td:last-child,
+.ledger th:last-child {
+  padding-right: 0;
+  text-align: right;
+}
+
+/* Repère numéroté posé au fil du texte, sur l'élément qu'il désigne. */
+.callout--sm {
+  width: 1.05rem;
+  height: 1.05rem;
+  font-size: 0.5rem;
+  flex: 0 0 auto;
 }

@@ -1,34 +1,48 @@
 import Link from "next/link";
-import { Logo } from "@/components/logo";
+import { publicFontVars } from "@/lib/fonts";
 
-const NAV = [
-  { href: "/#parcours", label: "Le parcours" },
-  { href: "/#fonctionnalites", label: "Fonctionnalités" },
-  { href: "/#portail", label: "Portail client" },
-  { href: "/#tarifs", label: "Tarifs" },
+const SECTIONS = [
+  { href: "/#dossier", label: "Dossier" },
+  { href: "/#parcours", label: "Parcours" },
+  { href: "/#controle", label: "Contrôle" },
+  { href: "/#validation", label: "Validation" },
+  { href: "/#conditions", label: "Conditions" },
 ];
+
+/** Marque typographique : lisible seule, sans pictogramme. */
+export function Wordmark({ className = "" }: { className?: string }) {
+  return (
+    <span className={`inline-flex items-center gap-2 ${className}`}>
+      <span className="h-2.5 w-2.5 shrink-0 bg-[var(--mark)]" aria-hidden />
+      <span className="display text-[0.95rem] uppercase tracking-[0.06em] sm:text-base">Garageflow</span>
+    </span>
+  );
+}
 
 export default function MarketingLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-dvh flex-col bg-steel-900 text-white">
-      <header className="sticky top-0 z-50 border-b border-steel-700/70 bg-steel-900/90 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+    <div className={`public flex min-h-dvh flex-col ${publicFontVars}`}>
+      <header className="rule-b sticky top-0 z-50 bg-[var(--paper)]">
+        <div className="mx-auto flex h-16 max-w-[84rem] items-center gap-4 px-5 sm:px-8">
           <Link href="/" aria-label="GarageFlow, accueil">
-            <Logo light />
+            <Wordmark />
           </Link>
-          <nav className="hidden items-center gap-1 lg:flex" aria-label="Sections du site">
-            {NAV.map((item) => (
-              <Link key={item.href} href={item.href} className="rounded-lg px-3 py-2 text-sm font-semibold text-steel-300 transition hover:bg-steel-800 hover:text-white">
-                {item.label}
+
+          <nav className="ml-8 hidden flex-1 items-center gap-7 lg:flex" aria-label="Sections">
+            {SECTIONS.map((s, i) => (
+              <Link key={s.href} href={s.href} className="field-tag transition-colors hover:text-[var(--ink)]">
+                <span className="mark">{String(i + 1).padStart(2, "0")}</span> {s.label}
               </Link>
             ))}
           </nav>
-          <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-            <Link href="/login" className="btn btn-ghost btn-sm px-2 text-steel-300 hover:bg-steel-800 hover:text-white sm:px-3.5">
+
+          <div className="ml-auto flex shrink-0 items-center gap-4 sm:gap-6">
+            <Link href="/login" className="field-tag transition-colors hover:text-[var(--ink)]">
               Connexion
             </Link>
-            <Link href="/register" className="btn btn-primary btn-sm px-3 sm:px-3.5">
-              Essai<span className="hidden sm:inline">&nbsp;gratuit</span>
+            <Link href="/register" className="link-arrow text-sm">
+              Essai<span className="hidden sm:inline">&nbsp;14 jours</span>
+              <span aria-hidden>→</span>
             </Link>
           </div>
         </div>
@@ -36,27 +50,31 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
 
       <main className="flex-1">{children}</main>
 
-      <footer className="border-t border-steel-700 bg-steel-900">
-        <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-          <div className="flex flex-col gap-8 md:flex-row md:justify-between">
-            <div className="max-w-sm">
-              <Logo light />
-              <p className="mt-3 text-sm leading-relaxed text-steel-300">
-                Le logiciel d&apos;atelier des garages indépendants : réception, diagnostic, validation client et restitution, sans papier.
+      <footer className="rule-heavy mt-24">
+        <div className="mx-auto max-w-[84rem] px-5 py-14 sm:px-8">
+          <div className="grid gap-12 md:grid-cols-[1.4fr_2fr]">
+            <div>
+              <Wordmark />
+              <p className="measure-tight mt-4 text-sm leading-relaxed text-[var(--ink-soft)]">
+                Logiciel d&apos;atelier pour garages indépendants. Réception, diagnostic, validation client, restitution. Édité en France.
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-8 text-sm sm:grid-cols-3">
-              <FooterGroup title="Produit" links={NAV} />
-              <FooterGroup
-                title="Compte"
+
+            <div className="grid grid-cols-2 gap-8 sm:grid-cols-3">
+              <FooterColumn
+                tag="Sections"
+                links={SECTIONS}
+              />
+              <FooterColumn
+                tag="Compte"
                 links={[
                   { href: "/register", label: "Créer un garage" },
                   { href: "/login", label: "Connexion" },
                   { href: "/forgot-password", label: "Mot de passe oublié" },
                 ]}
               />
-              <FooterGroup
-                title="Légal"
+              <FooterColumn
+                tag="Légal"
                 links={[
                   { href: "/cgu", label: "Conditions d'utilisation" },
                   { href: "/confidentialite", label: "Confidentialité" },
@@ -64,8 +82,9 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
               />
             </div>
           </div>
-          <p className="mt-10 border-t border-steel-700 pt-6 text-xs text-steel-300">
-            © {new Date().getFullYear()} GarageFlow. Hébergement en Union européenne. Aucune donnée n&apos;est revendue.
+
+          <p className="rule-t tech mt-12 pt-5 text-[0.7rem] uppercase tracking-[0.14em] text-[var(--ink-soft)]">
+            © {new Date().getFullYear()} GarageFlow · Hébergement Union européenne · Aucune donnée revendue · Réf. GF-{new Date().getFullYear()}-FR
           </p>
         </div>
       </footer>
@@ -73,14 +92,14 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
   );
 }
 
-function FooterGroup({ title, links }: { title: string; links: readonly { href: string; label: string }[] }) {
+function FooterColumn({ tag, links }: { tag: string; links: readonly { href: string; label: string }[] }) {
   return (
     <div>
-      <p className="mb-3 text-xs font-bold uppercase tracking-wider text-white">{title}</p>
-      <ul className="space-y-2">
+      <p className="field-tag rule-b pb-2">{tag}</p>
+      <ul className="mt-3 space-y-2">
         {links.map((l) => (
           <li key={l.href}>
-            <Link href={l.href} className="text-steel-300 transition hover:text-white">
+            <Link href={l.href} className="text-sm text-[var(--ink-soft)] transition-colors hover:text-[var(--ink)]">
               {l.label}
             </Link>
           </li>
