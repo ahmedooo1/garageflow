@@ -23,6 +23,9 @@ RUN corepack enable && apk add --no-cache libc6-compat
 WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000
 COPY --from=build /app/package.json /app/pnpm-lock.yaml ./
+# `next start` relit la config à l'exécution (images.qualities, formats) :
+# sans elle, l'optimiseur refuse q=68 et les aperçus de l'accueil renvoient 400.
+COPY --from=build /app/next.config.ts ./
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/.next ./.next
 COPY --from=build /app/public ./public
