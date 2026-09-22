@@ -90,6 +90,16 @@ fi
 # Vérifie la signature (certificat émis à GitHub Actions, inscrit au journal
 # de transparence Sigstore), l'identité du workflow signataire, le commit, et
 # que l'empreinte SHA-256 du fichier reçu est celle qui a été signée.
+#
+# L'empreinte est calculée ici, en flux, sur le fichier réellement reçu, puis
+# comparée par cosign à celle de l'attestation. Donner le fichier lui-même à
+# cosign le chargerait entièrement en mémoire (refusé au-delà de 128 Mo).
+EMPREINTE=$(sha256sum "$INCOMING/image.tar.gz" | cut -c1-64)
+case "$EMPREINTE" in
+  *[!0-9a-f]* | "") log "échec : empreinte illisible"; exit 8 ;;
+esac
+[ "${#EMPREINTE}" -eq 64 ] || { log "échec : empreinte illisible"; exit 8; }
+
 if ! "$COSIGN" verify-blob-attestation \
   --bundle "$INCOMING/attestation.json" \
   --type slsaprovenance1 \
@@ -98,11 +108,12 @@ if ! "$COSIGN" verify-blob-attestation \
   --certificate-github-workflow-repository "$DEPOT" \
   --certificate-github-workflow-ref refs/heads/master \
   --certificate-github-workflow-sha "$SHA" \
-  "$INCOMING/image.tar.gz" >/dev/null 2>>"$LOG"; then
+  --digest "$EMPREINTE" \
+  --digestAlg sha256 >/dev/null 2>>"$LOG"; then
   log "échec : image non authentifiée pour ${SHA}, rien n'a été chargé"
   exit 8
 fi
-log "image authentifiée (sha256 $(sha256sum "$INCOMING/image.tar.gz" | cut -c1-16)...)"
+log "image authentifiée (sha256 $(echo "$EMPREINTE" | cut -c1-16)...)"
 
 gunzip -c "$INCOMING/image.tar.gz" | docker load >/dev/null
 rm -f "$INCOMING/image.tar.gz"
