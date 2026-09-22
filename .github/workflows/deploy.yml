@@ -1,0 +1,77 @@
+name: Déploiement
+
+# Chaque push sur master : vérifications complètes, puis construction de
+# l'image sur le runner GitHub (le VPS partage sa mémoire avec d'autres
+# applications) et envoi au serveur. Côté VPS, la clé de déploiement ne peut
+# lancer que deploy/garageflow-deploy.sh, qui bascule et revient en arrière
+# si le site ne répond pas.
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+# Un seul déploiement à la fois ; un push plus récent n'annule pas celui en cours.
+concurrency:
+  group: deploiement-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  verifications:
+    uses: ./.github/workflows/ci.yml
+
+  deploiement:
+    name: Image · Mise en ligne
+    needs: verifications
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: production
+      url: https://garageflow.aaweb.fr
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Construction de l'image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          tags: garageflow:${{ github.sha }}
+          outputs: type=docker,dest=/tmp/garageflow.tar
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Clé SSH de déploiement
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy
+          chmod 600 ~/.ssh/deploy
+          # Empreinte du serveur figée : pas de confiance au premier contact.
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Envoi et bascule sur le VPS
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          gzip -1 -c /tmp/garageflow.tar | ssh -i ~/.ssh/deploy -p "$DEPLOY_PORT" \
+            -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o BatchMode=yes \
+            "$DEPLOY_USER@$DEPLOY_HOST" "$GITHUB_SHA"
+
+      - name: Vérification publique
+        run: |
+          for chemin in / /login; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "https://garageflow.aaweb.fr$chemin")
+            echo "$chemin -> $code"
+            [ "$code" = "200" ]
+          done
+
+      - name: Nettoyage de la clé
+        if: always()
+        run: rm -f ~/.ssh/deploy

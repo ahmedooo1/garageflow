@@ -1,9 +1,10 @@
 name: CI
 
+# Sur master, ces vérifications sont lancées par le workflow Déploiement, qui
+# ne met en ligne que si elles passent. Ici : les pull requests.
 on:
-  push:
-    branches: [main]
   pull_request:
+  workflow_call:
 
 env:
   DATABASE_URL: postgresql://postgres:postgres@localhost:5432/garageflow?schema=public
