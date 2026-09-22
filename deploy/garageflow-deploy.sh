@@ -8,23 +8,38 @@
 #
 # La clé ne peut donc rien faire d'autre que lancer ce script : pas de shell,
 # pas de redirection de port. Le seul argument accepté est le SHA du commit
-# (SSH_ORIGINAL_COMMAND), l'image arrive compressée sur l'entrée standard.
+# (SSH_ORIGINAL_COMMAND).
+#
+# Entrée standard : une ligne JSON (attestation Sigstore de l'image, signée
+# par GitHub Actions), puis l'image compressée. L'image n'est chargée que si
+# l'attestation prouve qu'elle a été produite par le workflow deploy.yml de
+# ce dépôt, sur master, pour ce commit. Détenir la clé SSH ne suffit donc pas
+# à faire tourner une image arbitraire.
 #
 # Périmètre : uniquement le projet Compose de /var/www/garageflow, le service
 # « app », et les images nommées « garageflow ». Aucune commande ne supprime
 # de volume ni ne modifie la base, hormis les migrations appliquées par
 # l'application elle-même au démarrage.
 set -eu
-# Journal et sauvegardes lisibles par le seul propriétaire.
+# Journal, sauvegardes et fichiers reçus lisibles par le seul propriétaire.
 umask 077
 
 DIR=/var/www/garageflow
 LOG="$DIR/deploy.log"
 BACKUPS="$DIR/backups"
+INCOMING="$DIR/incoming"
 PORT=3031
 # Une image décompressée pèse ~2,3 Go ; on garde la précédente pour le retour arrière.
 MIN_FREE_KB=4000000
 BACKUPS_GARDEES=5
+# Au-delà, l'envoi est refusé : protège le disque des autres sites.
+MAX_IMAGE_OCTETS=3000000000
+MAX_ATTESTATION_OCTETS=200000
+
+# Identité attendue du signataire : ce workflow, ce dépôt, cette branche.
+COSIGN=/usr/local/bin/cosign
+DEPOT=ahmedooo1/garageflow
+WORKFLOW="https://github.com/${DEPOT}/.github/workflows/deploy.yml@refs/heads/master"
 
 log() { echo "$(date -u +%FT%TZ) $*" | tee -a "$LOG"; }
 
@@ -49,8 +64,51 @@ if [ "$LIBRE" -lt "$MIN_FREE_KB" ]; then
   exit 4
 fi
 
-gunzip -c | docker load >/dev/null
+# --- Réception ------------------------------------------------------------
+
+rm -rf "$INCOMING"
+mkdir -p "$INCOMING"
+trap 'rm -rf "$INCOMING"' EXIT
+
+# `read` lit octet par octet sur un tube : le reste de l'entrée (l'image)
+# n'est pas consommé.
+IFS= read -r ATTESTATION || { log "échec : attestation absente"; exit 7; }
+if [ "${#ATTESTATION}" -gt "$MAX_ATTESTATION_OCTETS" ]; then
+  log "échec : attestation trop volumineuse"
+  exit 7
+fi
+printf '%s\n' "$ATTESTATION" >"$INCOMING/attestation.json"
+
+head -c $((MAX_IMAGE_OCTETS + 1)) >"$INCOMING/image.tar.gz"
+if [ "$(wc -c <"$INCOMING/image.tar.gz")" -gt "$MAX_IMAGE_OCTETS" ]; then
+  log "échec : image trop volumineuse, envoi refusé"
+  exit 7
+fi
+
+# --- Authenticité -----------------------------------------------------------
+
+# Vérifie la signature (certificat émis à GitHub Actions, inscrit au journal
+# de transparence Sigstore), l'identité du workflow signataire, le commit, et
+# que l'empreinte SHA-256 du fichier reçu est celle qui a été signée.
+if ! "$COSIGN" verify-blob-attestation \
+  --bundle "$INCOMING/attestation.json" \
+  --type slsaprovenance1 \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-identity "$WORKFLOW" \
+  --certificate-github-workflow-repository "$DEPOT" \
+  --certificate-github-workflow-ref refs/heads/master \
+  --certificate-github-workflow-sha "$SHA" \
+  "$INCOMING/image.tar.gz" >/dev/null 2>>"$LOG"; then
+  log "échec : image non authentifiée pour ${SHA}, rien n'a été chargé"
+  exit 8
+fi
+log "image authentifiée (sha256 $(sha256sum "$INCOMING/image.tar.gz" | cut -c1-16)...)"
+
+gunzip -c "$INCOMING/image.tar.gz" | docker load >/dev/null
+rm -f "$INCOMING/image.tar.gz"
 docker image inspect "garageflow:${SHA}" >/dev/null 2>&1 || { log "échec : image garageflow:${SHA} absente après chargement"; exit 5; }
+
+# --- Sauvegarde -------------------------------------------------------------
 
 # Sauvegarde de la base avant que la nouvelle version n'applique ses
 # migrations. Lecture seule sur la base ; jamais restaurée automatiquement.
@@ -66,6 +124,8 @@ log "sauvegarde $(basename "$DUMP") ($(du -h "$DUMP" | cut -f1))"
 ls -1t "$BACKUPS"/avant-*.dump 2>/dev/null | tail -n +$((BACKUPS_GARDEES + 1)) | while read -r ancien; do
   rm -f "$ancien"
 done
+
+# --- Bascule ----------------------------------------------------------------
 
 set_tag() { sed -i "s/^GARAGEFLOW_TAG=.*/GARAGEFLOW_TAG=$1/" .env; }
 
@@ -84,23 +144,30 @@ repond() {
 }
 
 # --no-deps : seul le conteneur de l'application est recréé, jamais la base.
-relancer_app() { docker compose up -d --no-deps app >/dev/null 2>&1 || true; }
+# Un échec de Compose est journalisé et renvoyé tel quel : l'appelant passe
+# directement au retour arrière, sans attendre le délai de vérification.
+relancer_app() {
+  if docker compose up -d --no-deps app >"$INCOMING/compose.log" 2>&1; then
+    return 0
+  fi
+  log "docker compose up a échoué :"
+  tail -n 20 "$INCOMING/compose.log" >>"$LOG"
+  return 1
+}
 
 set_tag "$SHA"
-relancer_app
 
-if repond; then
+if relancer_app && repond; then
   log "succès ${SHA}"
 else
-  log "échec : ${SHA} ne répond pas, retour à ${PREV}"
+  log "échec : ${SHA} ne démarre pas ou ne répond pas, retour à ${PREV}"
   if [ -n "$PREV" ]; then
     # Retour arrière = ancienne image seulement. La base reste telle quelle :
     # les migrations doivent donc être compatibles avec la version précédente
     # (vérifié en CI par scripts/verifier-migrations.mjs). En cas de besoin,
     # restauration manuelle depuis la sauvegarde ci-dessus.
     set_tag "$PREV"
-    relancer_app
-    if repond; then log "retour arrière effectué sur ${PREV}"; else log "ALERTE : ${PREV} ne répond pas non plus"; fi
+    if relancer_app && repond; then log "retour arrière effectué sur ${PREV}"; else log "ALERTE : ${PREV} ne répond pas non plus"; fi
   fi
   exit 1
 fi

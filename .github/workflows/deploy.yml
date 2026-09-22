@@ -5,6 +5,9 @@ name: Déploiement
 # applications) et envoi au serveur. Côté VPS, la clé de déploiement ne peut
 # lancer que deploy/garageflow-deploy.sh, qui bascule et revient en arrière
 # si le site ne répond pas.
+#
+# L'image est attestée (signature Sigstore émise pour ce workflow et ce
+# commit) et le VPS vérifie cette attestation avant de charger quoi que ce soit.
 on:
   push:
     branches: [master]
@@ -27,6 +30,11 @@ jobs:
     needs: verifications
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
+      # Jeton OIDC du workflow, échangé contre un certificat de signature Sigstore.
+      id-token: write
+      attestations: write
     environment:
       name: production
       url: https://garageflow.aaweb.fr
@@ -42,6 +50,16 @@ jobs:
           outputs: type=docker,dest=/tmp/garageflow.tar
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Compression
+        run: gzip -1 -c /tmp/garageflow.tar > /tmp/garageflow.tar.gz
+
+      # Signe l'empreinte SHA-256 de l'archive exacte qui sera envoyée.
+      - name: Attestation de provenance
+        id: attestation
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: /tmp/garageflow.tar.gz
 
       - name: Clé SSH de déploiement
         env:
@@ -59,8 +77,11 @@ jobs:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          ATTESTATION: ${{ steps.attestation.outputs.bundle-path }}
         run: |
-          gzip -1 -c /tmp/garageflow.tar | ssh -i ~/.ssh/deploy -p "$DEPLOY_PORT" \
+          # Une ligne JSON (l'attestation), puis l'archive : le VPS lit la
+          # première ligne, vérifie, et seulement ensuite charge l'image.
+          { jq -c . "$ATTESTATION"; cat /tmp/garageflow.tar.gz; } | ssh -i ~/.ssh/deploy -p "$DEPLOY_PORT" \
             -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o BatchMode=yes \
             "$DEPLOY_USER@$DEPLOY_HOST" "$GITHUB_SHA"
 
