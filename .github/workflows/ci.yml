@@ -45,6 +45,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Créer la base de test
         run: PGPASSWORD=postgres psql -h localhost -U postgres -c "CREATE DATABASE garageflow_test;"
+      - name: Migrations compatibles avec un retour arrière
+        run: node scripts/verifier-migrations.mjs
       - run: pnpm lint
       - run: pnpm typecheck
       - name: Tests unitaires + intégration

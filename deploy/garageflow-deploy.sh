@@ -10,15 +10,21 @@
 # pas de redirection de port. Le seul argument accepté est le SHA du commit
 # (SSH_ORIGINAL_COMMAND), l'image arrive compressée sur l'entrée standard.
 #
-# Étapes : chargement de l'image, bascule du tag dans .env, redémarrage du
-# conteneur, vérification HTTP. En cas d'échec, retour au tag précédent.
+# Périmètre : uniquement le projet Compose de /var/www/garageflow, le service
+# « app », et les images nommées « garageflow ». Aucune commande ne supprime
+# de volume ni ne modifie la base, hormis les migrations appliquées par
+# l'application elle-même au démarrage.
 set -eu
+# Journal et sauvegardes lisibles par le seul propriétaire.
+umask 077
 
 DIR=/var/www/garageflow
 LOG="$DIR/deploy.log"
+BACKUPS="$DIR/backups"
 PORT=3031
 # Une image décompressée pèse ~2,3 Go ; on garde la précédente pour le retour arrière.
 MIN_FREE_KB=4000000
+BACKUPS_GARDEES=5
 
 log() { echo "$(date -u +%FT%TZ) $*" | tee -a "$LOG"; }
 
@@ -28,9 +34,10 @@ case "$SHA" in
 esac
 [ "${#SHA}" -eq 40 ] || { echo "Commande refusée : SHA de 40 caractères attendu." >&2; exit 2; }
 
-# Deux déploiements simultanés se marcheraient dessus dans .env.
+# Un deuxième déploiement attend la fin du premier (20 min au plus) au lieu
+# de modifier .env en même temps que lui.
 exec 9>/tmp/garageflow-deploy.lock
-flock -n 9 || { echo "Un déploiement est déjà en cours." >&2; exit 3; }
+flock -w 1200 9 || { echo "Un autre déploiement occupe le verrou depuis 20 min, abandon." >&2; exit 3; }
 
 cd "$DIR"
 PREV=$(sed -n 's/^GARAGEFLOW_TAG=//p' .env)
@@ -44,6 +51,21 @@ fi
 
 gunzip -c | docker load >/dev/null
 docker image inspect "garageflow:${SHA}" >/dev/null 2>&1 || { log "échec : image garageflow:${SHA} absente après chargement"; exit 5; }
+
+# Sauvegarde de la base avant que la nouvelle version n'applique ses
+# migrations. Lecture seule sur la base ; jamais restaurée automatiquement.
+mkdir -p "$BACKUPS"
+DUMP="$BACKUPS/avant-${SHA}.dump"
+if ! docker compose exec -T db pg_dump -U garageflow -Fc garageflow >"$DUMP" 2>>"$LOG"; then
+  rm -f "$DUMP"
+  log "échec : sauvegarde de la base impossible, rien n'a été changé"
+  exit 6
+fi
+log "sauvegarde $(basename "$DUMP") ($(du -h "$DUMP" | cut -f1))"
+# On ne garde que les dernières sauvegardes, dans ce dossier uniquement.
+ls -1t "$BACKUPS"/avant-*.dump 2>/dev/null | tail -n +$((BACKUPS_GARDEES + 1)) | while read -r ancien; do
+  rm -f "$ancien"
+done
 
 set_tag() { sed -i "s/^GARAGEFLOW_TAG=.*/GARAGEFLOW_TAG=$1/" .env; }
 
@@ -61,27 +83,30 @@ repond() {
   return 1
 }
 
+# --no-deps : seul le conteneur de l'application est recréé, jamais la base.
+relancer_app() { docker compose up -d --no-deps app >/dev/null 2>&1 || true; }
+
 set_tag "$SHA"
-# Un échec ici est traité comme un échec de vérification : retour arrière.
-docker compose up -d app >/dev/null 2>&1 || true
+relancer_app
 
 if repond; then
   log "succès ${SHA}"
 else
   log "échec : ${SHA} ne répond pas, retour à ${PREV}"
-  docker compose logs --tail 40 app >>"$LOG" 2>&1 || true
   if [ -n "$PREV" ]; then
+    # Retour arrière = ancienne image seulement. La base reste telle quelle :
+    # les migrations doivent donc être compatibles avec la version précédente
+    # (vérifié en CI par scripts/verifier-migrations.mjs). En cas de besoin,
+    # restauration manuelle depuis la sauvegarde ci-dessus.
     set_tag "$PREV"
-    docker compose up -d app >/dev/null 2>&1
-    # Une migration déjà appliquée par la nouvelle version n'est pas annulée :
-    # les migrations doivent rester compatibles avec la version précédente.
-    repond && log "retour arrière effectué sur ${PREV}" || log "ALERTE : ${PREV} ne répond pas non plus"
+    relancer_app
+    if repond; then log "retour arrière effectué sur ${PREV}"; else log "ALERTE : ${PREV} ne répond pas non plus"; fi
   fi
   exit 1
 fi
 
-# Ménage : on ne garde que la version en ligne et la précédente.
+# Ménage : uniquement les images « garageflow », sauf la version en ligne et
+# la précédente. Aucun nettoyage global de Docker.
 docker images garageflow --format '{{.Tag}}' | while read -r tag; do
   [ "$tag" = "$SHA" ] || [ "$tag" = "$PREV" ] || docker rmi "garageflow:${tag}" >/dev/null 2>&1 || true
 done
-docker image prune -f >/dev/null 2>&1 || true
