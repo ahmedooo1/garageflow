@@ -6,7 +6,7 @@ import { audit } from "./audit";
 
 /**
  * Console plateforme : vue d'exploitation pour l'équipe GarageFlow.
- * Volontairement limitée à des agrégats et à l'abonnement — aucun accès aux
+ * Volontairement limitée à des agrégats et à l'abonnement - aucun accès aux
  * données métier des garages (clients, véhicules, dossiers).
  */
 

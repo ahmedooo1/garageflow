@@ -53,7 +53,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                     </div>
                     <div>
                       <dt>{g.access.trialing ? "Fin d'essai" : "Échéance"}</dt>
-                      <dd>{g.access.trialing ? formatDate(g.trialEndsAt) : g.currentPeriodEnd ? formatDate(g.currentPeriodEnd) : "—"}</dd>
+                      <dd>{g.access.trialing ? formatDate(g.trialEndsAt) : g.currentPeriodEnd ? formatDate(g.currentPeriodEnd) : "-"}</dd>
                     </div>
                     <div>
                       <dt>Usage</dt>
@@ -63,7 +63,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                     </div>
                     <div>
                       <dt>Dernière activité</dt>
-                      <dd>{g.lastActivityAt ? formatDate(g.lastActivityAt) : "—"}</dd>
+                      <dd>{g.lastActivityAt ? formatDate(g.lastActivityAt) : "-"}</dd>
                     </div>
                   </dl>
                   {g.suspendedReason && <p className="mt-2 text-sm font-semibold text-danger">Suspendu : {g.suspendedReason}</p>}

@@ -48,9 +48,9 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
         <Card title="Coordonnées" className="lg:col-span-1">
           <KV
             items={[
-              { label: "Téléphone", value: customer.phone ? <a href={`tel:${customer.phone}`} className="font-semibold text-accent">{customer.phone}</a> : "—" },
-              { label: "Email", value: customer.email ? <a href={`mailto:${customer.email}`} className="break-all text-accent">{customer.email}</a> : "—" },
-              { label: "Adresse", value: customer.address || "—" },
+              { label: "Téléphone", value: customer.phone ? <a href={`tel:${customer.phone}`} className="font-semibold text-accent">{customer.phone}</a> : "-" },
+              { label: "Email", value: customer.email ? <a href={`mailto:${customer.email}`} className="break-all text-accent">{customer.email}</a> : "-" },
+              { label: "Adresse", value: customer.address || "-" },
             ]}
           />
           {customer.notes && (
@@ -73,7 +73,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
                       {v.make} {v.model}
                     </span>
                     <span className="text-sm text-muted">
-                      {v.year ?? "—"} · {FUEL_LABELS[v.fuel]} · {formatKm(v.mileage)}
+                      {v.year ?? "-"} · {FUEL_LABELS[v.fuel]} · {formatKm(v.mileage)}
                     </span>
                   </Link>
                 </li>

@@ -82,7 +82,7 @@ export default async function DossiersPage({ searchParams }: { searchParams: Pro
                     </Link>
                   </td>
                   <td className="hidden px-4 py-3 md:table-cell">{fullName(wo.customer)}</td>
-                  <td className="hidden px-4 py-3 lg:table-cell">{wo.technician ? fullName(wo.technician) : <span className="text-muted">—</span>}</td>
+                  <td className="hidden px-4 py-3 lg:table-cell">{wo.technician ? fullName(wo.technician) : <span className="text-muted">-</span>}</td>
                   <td className="hidden px-4 py-3 lg:table-cell">{formatDateTime(wo.promisedAt)}</td>
                   <td className="px-4 py-3">
                     <StatusBadge status={wo.status} />

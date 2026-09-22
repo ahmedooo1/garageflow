@@ -68,7 +68,7 @@ export function BoardCard({ wo, now }: { wo: WorkOrderCardData; now: number }) {
         </span>
         <span className={`inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-bold ${late ? "bg-danger text-white" : soon ? "bg-warn-soft text-warn" : "text-muted"}`}>
           {late ? <AlertTriangle className="h-3.5 w-3.5" /> : <Clock className="h-3.5 w-3.5" />}
-          {late ? "Retard" : wo.promisedAt ? formatShort(wo.promisedAt) : "—"}
+          {late ? "Retard" : wo.promisedAt ? formatShort(wo.promisedAt) : "-"}
         </span>
       </div>
       <div className={`px-4 pb-2.5 pt-1 text-[11px] font-extrabold uppercase tracking-wider ${TEXT[tone]} bg-surface-2`}>{STATUS_LABELS[wo.status]}</div>

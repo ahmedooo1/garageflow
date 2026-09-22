@@ -1,5 +1,6 @@
 import "dotenv/config";
 import sharp from "sharp";
+import { exigerEnvironnementLocal } from "../scripts/garde-environnement.mjs";
 import { prisma } from "@/server/db";
 import type { Ctx } from "@/server/context";
 import { hashPassword } from "@/server/lib/password";
@@ -47,6 +48,10 @@ function inDays(days: number, hour = 18): Date {
 }
 
 async function main() {
+  // Avant toute écriture : ce script purge un garage et installe un compte dont
+  // le mot de passe est publié dans ce dépôt. Jamais sur une base distante.
+  exigerEnvironnementLocal({ tache: "seed de démonstration", urlBaseDeDonnees: process.env.DATABASE_URL });
+
   const existing = await prisma.user.findUnique({ where: { email: DEMO_OWNER_EMAIL }, select: { garageId: true } });
   if (existing) {
     console.log("Suppression du garage démo existant…");

@@ -98,7 +98,7 @@ export function KV({ items }: { items: { label: string; value: ReactNode }[] }) 
       {items.map((it) => (
         <div key={it.label}>
           <dt>{it.label}</dt>
-          <dd>{it.value ?? "—"}</dd>
+          <dd>{it.value ?? "-"}</dd>
         </div>
       ))}
     </dl>

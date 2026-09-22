@@ -66,6 +66,53 @@ test("le tableau de tarifs reste lisible sur mobile", async ({ page }) => {
   expect(debordement).toBe(0);
 });
 
+test("les copies d'écran du produit sont réellement chargées", async ({ page }) => {
+  await page.goto("/");
+
+  // Elles sont en chargement différé : sans parcourir la page, on testerait
+  // des images simplement pas encore demandées.
+  await page.evaluate(async () => {
+    for (let y = 0; y < document.body.scrollHeight; y += window.innerHeight) {
+      window.scrollTo(0, y);
+      await new Promise((r) => setTimeout(r, 100));
+    }
+  });
+
+  const captures = page.getByRole("img", { name: /GarageFlow|dossiers d'intervention|Feuille de contrôle|Écran de validation/ });
+  const total = await captures.count();
+  expect(total, "les cinq aperçus produit doivent être présents").toBe(5);
+
+  // Une image cassée resterait invisible dans les autres assertions, qui ne
+  // portent que sur du texte : on vérifie le décodage, pas la seule présence.
+  for (const capture of await captures.all()) {
+    const etat = await capture.evaluate((n: HTMLImageElement) => ({ ok: n.complete && n.naturalWidth > 0, alt: n.alt.slice(0, 40) }));
+    expect(etat.ok, `image non chargée : ${etat.alt}`).toBe(true);
+  }
+
+  // Les légendes ne doivent pas promettre plus que ce que les images montrent.
+  await expect(page.locator("#dossier").locator("..")).toContainText("Copie d'écran de l'application");
+});
+
+test("la décision affichée correspond à celle du jeu de démonstration", async ({ page }) => {
+  // La page reproduit une décision client réelle. Si le seed change, la
+  // reproduction ment : ce test rend l'écart visible au lieu de le laisser passer.
+  await page.goto("/");
+  const chapitre = page.locator("#validation").locator("..");
+  await expect(chapitre).toContainText("285,00 € TTC");
+  await expect(chapitre).toContainText("Remplacement plaquettes de frein avant");
+  await expect(chapitre).toContainText("Balais d'essuie-glace avant");
+  await expect(chapitre).toContainText("Les essuie-glaces, je les ferai moi-même.");
+});
+
+test("aucun cadratin dans le texte affiché", async ({ page }) => {
+  // Règle de rédaction du projet : trait d'union simple, jamais de tiret long.
+  for (const url of ["/", "/cgu", "/confidentialite"]) {
+    await page.goto(url);
+    const texte = await page.evaluate(() => document.body.innerText);
+    expect(texte, `cadratin trouvé sur ${url}`).not.toContain("—");
+  }
+});
+
 test("les pages légales sont accessibles depuis le pied de page", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("contentinfo").getByRole("link", { name: "Conditions d'utilisation" }).click();

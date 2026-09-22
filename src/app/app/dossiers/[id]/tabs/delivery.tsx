@@ -71,7 +71,7 @@ export function DeliveryTab({ wo, estimates, role }: { wo: WorkOrderDetail; esti
             items={[
               { label: "Client", value: fullName(wo.customer) },
               { label: "Kilométrage entrée", value: formatKm(wo.mileageIn) },
-              { label: "Kilométrage sortie", value: wo.mileageOut ? formatKm(wo.mileageOut) : "—" },
+              { label: "Kilométrage sortie", value: wo.mileageOut ? formatKm(wo.mileageOut) : "-" },
             ]}
           />
           <div className="mt-4 grid gap-4 sm:grid-cols-2">

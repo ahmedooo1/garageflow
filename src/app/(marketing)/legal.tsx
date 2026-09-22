@@ -40,7 +40,7 @@ export function LegalSection({ title, children }: { title: string; children: Rea
 
   return (
     <section className="rule-t grid gap-x-6 gap-y-3 py-7 first:border-t-2 first:border-[var(--ink)] sm:grid-cols-[3rem_1fr]">
-      <p className="tech pt-1 text-sm text-[var(--ink-soft)]">{n ? String(n).padStart(2, "0") : "—"}</p>
+      <p className="tech pt-1 text-sm text-[var(--ink-soft)]">{n ? String(n).padStart(2, "0") : "-"}</p>
       <div>
         <h2 className="display display-m">{label}</h2>
         <div className="measure mt-3 space-y-3 leading-relaxed text-[var(--ink-soft)]">{children}</div>

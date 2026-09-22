@@ -21,7 +21,7 @@ export function OverviewTab({ wo, photos, estimates, findings }: { wo: WorkOrder
             { label: "Kilométrage entrée", value: formatKm(wo.mileageIn) },
             { label: "Restitution prévue", value: formatDateTime(wo.promisedAt) },
             { label: "Technicien", value: wo.technician ? fullName(wo.technician) : "Non assigné" },
-            { label: "Kilométrage sortie", value: wo.mileageOut ? formatKm(wo.mileageOut) : "—" },
+            { label: "Kilométrage sortie", value: wo.mileageOut ? formatKm(wo.mileageOut) : "-" },
           ]}
         />
         <div className="mt-4 space-y-2 text-sm">
@@ -43,9 +43,9 @@ export function OverviewTab({ wo, photos, estimates, findings }: { wo: WorkOrder
         <KV
           items={[
             { label: "Modèle", value: `${wo.vehicle.make} ${wo.vehicle.model}` },
-            { label: "Année", value: wo.vehicle.year ?? "—" },
+            { label: "Année", value: wo.vehicle.year ?? "-" },
             { label: "Carburant", value: FUEL_LABELS[wo.vehicle.fuel] },
-            { label: "VIN", value: wo.vehicle.vin ? <span className="font-mono text-sm">{wo.vehicle.vin}</span> : "—" },
+            { label: "VIN", value: wo.vehicle.vin ? <span className="font-mono text-sm">{wo.vehicle.vin}</span> : "-" },
           ]}
         />
         <Link href={`/app/vehicules/${wo.vehicle.id}`} className="btn btn-secondary btn-sm mt-4">

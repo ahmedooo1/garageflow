@@ -66,11 +66,11 @@ export default async function VehiclePage({ params }: { params: Promise<{ id: st
           <KV
             items={[
               { label: "Immatriculation", value: <Plate plate={vehicle.plate} /> },
-              { label: "VIN", value: vehicle.vin ? <span className="font-mono">{vehicle.vin}</span> : "—" },
-              { label: "Année", value: vehicle.year ?? "—" },
+              { label: "VIN", value: vehicle.vin ? <span className="font-mono">{vehicle.vin}</span> : "-" },
+              { label: "Année", value: vehicle.year ?? "-" },
               { label: "Carburant", value: FUEL_LABELS[vehicle.fuel] },
               { label: "Kilométrage", value: formatKm(vehicle.mileage) },
-              { label: "Couleur", value: vehicle.color || "—" },
+              { label: "Couleur", value: vehicle.color || "-" },
             ]}
           />
           {vehicle.notes && <p className="mt-4 whitespace-pre-line rounded-[10px] bg-surface-2 p-3 text-sm">{vehicle.notes}</p>}

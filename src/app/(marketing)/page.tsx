@@ -1,6 +1,13 @@
 import type { Metadata } from "next";
+import Image, { type StaticImageData } from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { AlertTriangle, Check, ClipboardCheck, LayoutGrid, PenLine, Receipt, Route, X } from "lucide-react";
+import apercuAtelier from "./apercu-atelier.png";
+import apercuClient from "./apercu-client.png";
+import apercuControle from "./apercu-controle.png";
+import apercuDossier from "./apercu-dossier.png";
+import apercuStatuts from "./apercu-statuts.png";
 import { CHECKLIST_SECTIONS, STATUS_LABELS } from "@/lib/labels";
 import { formatPriceHt, PLANS, TRIAL_DAYS } from "@/lib/plans";
 import { getSession } from "@/server/auth/session";
@@ -38,14 +45,17 @@ function Shell({ children, className = "" }: { children: React.ReactNode; classN
   return <div className={`mx-auto max-w-[84rem] px-5 sm:px-8 ${className}`}>{children}</div>;
 }
 
-/** En-tête de chapitre : numéro, titre, chapeau décalé à droite. */
-function Chapter({ n, id, title, standfirst }: { n: string; id: string; title: string; standfirst: string }) {
+/** En-tête de chapitre : numéro, pictogramme, titre, chapeau décalé à droite. */
+function Chapter({ n, id, title, standfirst, icon: Icon }: { n: string; id: string; title: string; standfirst: string; icon: React.ComponentType<{ className?: string }> }) {
   return (
     <header id={id} className="rule-heavy scroll-mt-16 pt-5">
       <div className="grid gap-7 md:grid-cols-12 md:gap-8">
         <div className="md:col-span-7">
-          <p className="field-tag">
+          <p className="field-tag flex items-center gap-2.5">
             <span className="mark">§ {n}</span>
+            {/* Pictogramme de repérage, à la graisse du texte : il situe le
+                chapitre d'un coup d'œil dans le sommaire vertical. */}
+            <Icon className="h-3.5 w-3.5 text-[var(--ink-soft)]" aria-hidden />
           </p>
           <h2 className="display display-l mt-3">{title}</h2>
         </div>
@@ -65,6 +75,56 @@ function PlateFr({ value, className = "" }: { value: string; className?: string 
   );
 }
 
+/**
+ * Copie d'écran du produit, encadrée et légendée.
+ *
+ * Sous 768 px l'image garde une largeur fixe et défile horizontalement :
+ * réduite à la largeur d'un téléphone, le texte des écrans serait illisible.
+ * Les captures sont régénérées par `npm run capture:apercu`.
+ */
+function Apercu({
+  src,
+  alt,
+  legende,
+  className = "",
+  largeurMobile = "w-[52rem]",
+  telephone = false,
+}: {
+  src: StaticImageData;
+  alt: string;
+  legende: React.ReactNode;
+  className?: string;
+  largeurMobile?: string;
+  /** L'écran du client est lu sur un téléphone : on le montre à sa taille. */
+  telephone?: boolean;
+}) {
+  const image = (
+    <Image
+      src={src}
+      alt={alt}
+      sizes={telephone ? "24rem" : "(min-width: 768px) 56rem, 52rem"}
+      /* 68 plutôt que 75 : sur ces captures, 15 % de poids en moins pour une
+         différence invisible à la taille d'affichage (vérifié à l'agrandissement). */
+      quality={68}
+      className={telephone ? "block w-full" : `block max-w-none md:w-full ${largeurMobile}`}
+    />
+  );
+  return (
+    <figure className={`min-w-0 ${className}`}>
+      {telephone ? (
+        // Cadre sobre : l'épaisseur d'un téléphone, sans encoche ni reflet.
+        <div className="mx-auto w-full max-w-[22rem] rounded-[2rem] border-[10px] border-[#12151a] bg-[#12151a]">
+          <div className="overflow-hidden rounded-[1.4rem]">{image}</div>
+        </div>
+      ) : (
+        <div className="scrollbar-thin overflow-x-auto border border-[var(--rule-strong)]">{image}</div>
+      )}
+      {!telephone && <p className="scroll-note field-tag field-tag--xs mt-3">Faites glisser la copie d&apos;écran →</p>}
+      <figcaption className="field-tag rule-t mt-4 pt-3">{legende}</figcaption>
+    </figure>
+  );
+}
+
 /* ========================================================================== */
 /* Ouverture                                                                  */
 /* ========================================================================== */
@@ -78,52 +138,37 @@ const FICHE = [
   { k: "Essai", v: `${TRIAL_DAYS} jours, sans carte bancaire` },
 ];
 
-/**
- * Présence produit du haut de page : l'en-tête d'un dossier d'intervention,
- * repris de l'écran principal de l'application. Un bandeau, pas une maquette.
- */
-function DossierStrip() {
-  const champs = [
-    { k: "Client", v: "Jean Martin" },
-    { k: "Kilométrage", v: "87 650 km" },
-    { k: "Technicien", v: "Karim Benali" },
-    { k: "Restitution prévue", v: "Aujourd'hui 17:00" },
-  ];
-  return (
-    <figure className="mt-16">
-      <div className="rule-heavy pt-4">
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
-          <span className="tech text-sm text-[var(--ink-soft)]">OR 2026-0001</span>
-          <PlateFr value="GH-123-KL" className="text-sm" />
-          <span className="display text-2xl">Peugeot 308</span>
-          <span className="field-tag field-tag--xs ml-auto border border-[var(--rule-strong)] px-2.5 py-1 text-[var(--ink)]">Diagnostic en cours</span>
-        </div>
-
-        <dl className="mt-5 grid grid-cols-2 gap-x-8 gap-y-4 sm:grid-cols-4">
-          {champs.map((c) => (
-            <div key={c.k}>
-              <dt className="field-tag field-tag--xs">{c.k}</dt>
-              <dd className="mt-1 text-[0.9375rem] font-semibold">{c.v}</dd>
-            </div>
-          ))}
-        </dl>
-
-        <p className="rule-t mt-5 pt-3 text-sm text-[var(--ink-soft)]">
-          <span className="field-tag field-tag--xs mr-2">Motif</span>
-          Bruit au freinage + révision
-        </p>
-      </div>
-      <figcaption className="field-tag field-tag--xs mt-3">En-tête d&apos;un dossier d&apos;intervention, tel qu&apos;il apparaît dans GarageFlow.</figcaption>
-    </figure>
-  );
-}
-
 const SOMMAIRE = [
-  { n: "01", href: "#dossier", label: "Le dossier", note: "Ce que l'atelier a sous les yeux" },
-  { n: "02", href: "#parcours", label: "Le parcours", note: "Huit étapes, treize statuts" },
-  { n: "03", href: "#controle", label: "Le contrôle", note: "Dix-sept points, quatre états" },
-  { n: "04", href: "#validation", label: "La validation", note: "La réponse écrite du client" },
-  { n: "05", href: "#conditions", label: "Les conditions", note: "Comptes, prix, engagement" },
+  {
+    n: "01",
+    href: "#dossier",
+    label: "Le dossier",
+    note: "Ce que l'atelier a sous les yeux",
+  },
+  {
+    n: "02",
+    href: "#parcours",
+    label: "Le parcours",
+    note: "Huit étapes, treize statuts",
+  },
+  {
+    n: "03",
+    href: "#controle",
+    label: "Le contrôle",
+    note: "Dix-sept points, quatre états",
+  },
+  {
+    n: "04",
+    href: "#validation",
+    label: "La validation",
+    note: "La réponse écrite du client",
+  },
+  {
+    n: "05",
+    href: "#conditions",
+    label: "Les conditions",
+    note: "Comptes, prix, engagement",
+  },
 ];
 
 function Ouverture() {
@@ -171,7 +216,13 @@ function Ouverture() {
           </dl>
         </div>
 
-        <DossierStrip />
+        <Apercu
+          className="mt-16"
+          src={apercuDossier}
+          largeurMobile="w-[64rem]"
+          alt="Fiche d'un dossier d'intervention dans GarageFlow : plaque GH-123-KL, Peugeot 308, statut En réparation, client Jean Martin, 87 650 km, technicien Karim Benali, restitution prévue le 22/09 à 17:00. En dessous, les sept photos de réception, les trois constats du technicien avec leur niveau d'urgence, et la décision du client ligne par ligne pour un montant accepté de 285,00 € TTC."
+          legende={<>Fig. 01 - Un dossier d&apos;intervention, tel qu&apos;il apparaît à l&apos;atelier. Copie d&apos;écran de l&apos;application, jeu de démonstration.</>}
+        />
 
         {/* Sommaire du dossier */}
         <nav className="mt-20" aria-label="Sommaire">
@@ -194,14 +245,37 @@ function Ouverture() {
 }
 
 /* ========================================================================== */
-/* 01 · Le dossier — planche annotée                                          */
+/* 01 · Le dossier - planche annotée                                          */
 /* ========================================================================== */
 
+/* Chaque note décrit un élément réellement visible sur la capture ci-contre.
+   Le « repère » nomme ce qu'il faut y chercher : pas d'annotation posée sur
+   l'image, qui se décalerait à la première recapture. */
 const NOTES = [
-  { n: "01", t: "Un couloir par étape", d: "Les huit couloirs suivent l'ordre réel du travail. Un véhicule n'apparaît jamais à deux endroits." },
-  { n: "02", t: "La plaque d'abord", d: "C'est ce qu'un compagnon cherche en entrant. Elle est en tête de carte, lisible à deux mètres." },
-  { n: "03", t: "Le retard saute aux yeux", d: "Passée l'heure promise, la carte se marque. Rien d'autre n'est coloré sur ce tableau." },
-  { n: "04", t: "Qui a la voiture", d: "Initiales du technicien et heure de restitution promise, sur chaque carte." },
+  {
+    n: "01",
+    t: "Un couloir par étape",
+    d: "Huit couloirs suivent l'ordre réel du travail, de la réception à la restitution. Un véhicule n'apparaît jamais à deux endroits.",
+    r: "Couloirs 1 à 5",
+  },
+  {
+    n: "02",
+    t: "La plaque d'abord",
+    d: "C'est ce qu'un compagnon cherche en entrant. Elle est en tête de carte, lisible à deux mètres.",
+    r: "GT-654-HJ",
+  },
+  {
+    n: "03",
+    t: "Le retard saute aux yeux",
+    d: "Passée l'heure promise, la carte prend un liseré rouge et le repère « Retard ». Le compteur en tête rassemble les dossiers concernés.",
+    r: "2 en retard",
+  },
+  {
+    n: "04",
+    t: "Qui a la voiture",
+    d: "Technicien et heure de restitution promise sur chaque carte. Le filtre en tête isole les dossiers d'un compagnon.",
+    r: "Karim Benali · 3",
+  },
 ];
 
 function Dossier() {
@@ -210,6 +284,7 @@ function Dossier() {
       <Shell>
         <Chapter
           n="01"
+          icon={LayoutGrid}
           id="dossier"
           title="Ce que l'atelier a sous les yeux"
           standfirst="Un seul écran pour la journée. Il tient sur la tablette accrochée au mur et se lit depuis le pont."
@@ -224,110 +299,28 @@ function Dossier() {
                 <div>
                   <p className="display display-m">{note.t}</p>
                   <p className="mt-1.5 text-sm leading-relaxed text-[var(--ink-soft)]">{note.d}</p>
+                  <p className="field-tag field-tag--xs mt-2">
+                    Repère <span className="tech ml-1.5 normal-case tracking-normal text-[var(--ink)]">{note.r}</span>
+                  </p>
                 </div>
               </li>
             ))}
           </ol>
 
-          {/* Planche */}
-          <figure className="order-1 min-w-0 md:order-2 md:col-span-7 md:col-start-6">
-            <Board />
-            <p className="scroll-note field-tag field-tag--xs mt-3">Faites glisser la planche →</p>
-            <figcaption className="field-tag rule-t mt-4 pt-3">
-              Fig. 01 — Tableau d&apos;atelier, six véhicules en cours. Copie d&apos;écran de l&apos;application.
-            </figcaption>
-          </figure>
+          <Apercu
+            className="order-1 md:order-2 md:col-span-7 md:col-start-6"
+            src={apercuAtelier}
+            alt="Tableau d'atelier de GarageFlow : quatre compteurs en tête (6 véhicules en cours, 2 en retard, 1 en attente client, 1 prêt à restituer), un filtre par technicien, puis les couloirs À diagnostiquer, Diagnostic, Attente client, Attente pièces et À réparer. Chaque carte porte la plaque, le numéro de dossier, le véhicule, le client, le motif, le technicien et l'heure de restitution promise."
+            legende={
+              <>
+                Fig. 02 - Le tableau d&apos;atelier. Copie d&apos;écran de l&apos;application, jeu de démonstration. Six véhicules en cours ; les cinq premiers couloirs sur huit
+                sont visibles.
+              </>
+            }
+          />
         </div>
       </Shell>
     </section>
-  );
-}
-
-type BoardCard = {
-  plate: string;
-  model: string;
-  customer: string;
-  tech: string;
-  time: string;
-  status: string;
-  late?: boolean;
-  /** Repère de la marge, posé sur l'élément exact que la note décrit. */
-  markPlate?: string;
-  markTime?: string;
-  markTech?: string;
-};
-
-const LANES: { label: string; mark?: string; cards: BoardCard[] }[] = [
-  {
-    label: "Diagnostic",
-    mark: "01",
-    cards: [{ plate: "GH-123-KL", model: "Peugeot 308", customer: "Jean Martin", tech: "KB", time: "17:00", status: "Diagnostic en cours", markPlate: "02" }],
-  },
-  {
-    label: "Attente client",
-    cards: [{ plate: "EZ-789-DE", model: "VW Golf 7", customer: "Sophie Leroux", tech: "JM", time: "12:00", status: "Attente client" }],
-  },
-  {
-    label: "En réparation",
-    cards: [
-      { plate: "DK-321-FG", model: "Citroën Jumper", customer: "Marc Fontaine", tech: "KB", time: "Retard", status: "En réparation", late: true, markTime: "03" },
-      { plate: "GT-654-HJ", model: "Toyota Yaris", customer: "Nadia Haddad", tech: "JM", time: "18:00", status: "En réparation" },
-    ],
-  },
-  {
-    label: "Prêt",
-    cards: [{ plate: "FR-147-LN", model: "Peugeot 3008", customer: "Bernard Petit", tech: "JM", time: "16:00", status: "Véhicule prêt", markTech: "04" }],
-  },
-];
-
-function Mark({ n }: { n: string }) {
-  return <span className="callout callout--sm">{n}</span>;
-}
-
-function Board() {
-  return (
-    <div className="scrollbar-thin overflow-x-auto">
-      <div className="min-w-[38rem] border border-[var(--rule-strong)] bg-[var(--paper-2)]">
-        <div className="rule-b flex items-baseline justify-between gap-3 px-4 py-3">
-          <span className="field-tag">Garage Normandie Auto</span>
-          <span className="tech text-[0.75rem] text-[var(--ink-soft)]">6 en cours · 1 en retard</span>
-        </div>
-
-        <div className="grid grid-cols-4 gap-px bg-[var(--rule)]">
-          {LANES.map((lane) => (
-            <div key={lane.label} className="bg-[var(--paper)] p-2">
-              <p className="field-tag field-tag--xs flex items-center gap-1.5 pb-2">
-                {lane.mark && <Mark n={lane.mark} />}
-                <span className="truncate">{lane.label}</span>
-              </p>
-              <div className="space-y-2">
-                {lane.cards.map((c) => (
-                  <article key={c.plate} className={`border bg-white p-2 ${c.late ? "border-[var(--mark)]" : "border-[var(--rule-strong)]"}`}>
-                    <span className="flex items-center gap-1.5">
-                      {c.markPlate && <Mark n={c.markPlate} />}
-                      <PlateFr value={c.plate} className="text-[0.7rem]" />
-                    </span>
-                    <p className="mt-2 truncate text-[0.875rem] font-bold leading-tight text-[#14181d]">{c.model}</p>
-                    <p className="truncate text-[0.78rem] text-[#4b525b]">{c.customer}</p>
-                    <p className="tech mt-2 flex items-center justify-between gap-1 text-[0.7rem] text-[#4b525b]">
-                      <span className="flex items-center gap-1">
-                        {c.markTech && <Mark n={c.markTech} />}
-                        {c.tech}
-                      </span>
-                      <span className={`flex items-center gap-1 ${c.late ? "font-semibold text-[var(--mark)]" : ""}`}>
-                        {c.markTime && <Mark n={c.markTime} />}
-                        {c.time}
-                      </span>
-                    </p>
-                    <p className="mt-2 border-t border-[#d7d4cc] pt-1.5 text-[0.625rem] font-bold uppercase tracking-[0.1em] text-[#4b525b]">{c.status}</p>
-                  </article>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -343,8 +336,18 @@ const ETAPES = [
     d: "Client, véhicule, kilométrage, motif. Photos sous tous les angles : les rayures déjà là sont actées avant l’entrée.",
     inset: "plate" as const,
   },
-  { h: "08:20", n: "02", t: "Diagnostic", d: "Le technicien saisit ses constats, avec un niveau d’urgence et des photos. Rien n’est généré automatiquement." },
-  { h: "09:10", n: "03", t: "Contrôle", d: "Dix-sept points imposés. Chacun reçoit un état, et si besoin un commentaire et une photo." },
+  {
+    h: "08:20",
+    n: "02",
+    t: "Diagnostic",
+    d: "Le technicien saisit ses constats, avec un niveau d’urgence et des photos. Rien n’est généré automatiquement.",
+  },
+  {
+    h: "09:10",
+    n: "03",
+    t: "Contrôle",
+    d: "Dix-sept points imposés. Chacun reçoit un état, et si besoin un commentaire et une photo.",
+  },
   {
     h: "10:35",
     n: "04",
@@ -352,10 +355,30 @@ const ETAPES = [
     d: "Pièces, main-d’œuvre, TVA, total. Les montants sont calculés au centime, jamais en virgule flottante.",
     inset: "prix" as const,
   },
-  { h: "10:50", n: "05", t: "Validation client", d: "Un lien personnel part au client. Il accepte ou refuse, ligne par ligne. Sa réponse est horodatée et verrouillée." },
-  { h: "13:15", n: "06", t: "Réparation", d: "L'atelier ne voit que les lignes acceptées. Chacune est cochée quand elle est faite." },
-  { h: "16:40", n: "07", t: "Contrôle final", d: "Essai routier, niveaux, voyants, outils retirés. Sans ce contrôle, le véhicule ne passe pas « prêt »." },
-  { h: "17:25", n: "08", t: "Restitution", d: "Travaux réalisés, refusés, montant final, kilométrage de sortie. Le refus d’aujourd’hui sert au prochain passage." },
+  {
+    h: "10:50",
+    n: "05",
+    t: "Validation client",
+    d: "Un lien personnel part au client. Il accepte ou refuse, ligne par ligne. Sa réponse est horodatée et verrouillée.",
+  },
+  {
+    h: "13:15",
+    n: "06",
+    t: "Réparation",
+    d: "L'atelier ne voit que les lignes acceptées. Chacune est cochée quand elle est faite.",
+  },
+  {
+    h: "16:40",
+    n: "07",
+    t: "Contrôle final",
+    d: "Essai routier, niveaux, voyants, outils retirés. Sans ce contrôle, le véhicule ne passe pas « prêt ».",
+  },
+  {
+    h: "17:25",
+    n: "08",
+    t: "Restitution",
+    d: "Travaux réalisés, refusés, montant final, kilométrage de sortie. Le refus d’aujourd’hui sert au prochain passage.",
+  },
 ];
 
 const STATUS_ORDER = Object.keys(STATUS_LABELS) as (keyof typeof STATUS_LABELS)[];
@@ -366,6 +389,7 @@ function Parcours() {
       <Shell>
         <Chapter
           n="02"
+          icon={Route}
           id="parcours"
           title="Une journée, huit étapes"
           standfirst="Le serveur vérifie chaque passage d'une étape à l'autre. On ne saute pas le contrôle final, on ne répare pas ce qui n'a pas été accepté."
@@ -422,7 +446,12 @@ function Parcours() {
           </p>
           <p className="scroll-note field-tag field-tag--xs mt-3">Faites glisser l’échelle →</p>
           <div className="scrollbar-thin overflow-x-auto pt-5">
-            <ol className="grid min-w-[56rem] gap-px" style={{ gridTemplateColumns: `repeat(${STATUS_ORDER.length}, minmax(0, 1fr))` }}>
+            <ol
+              className="grid min-w-[56rem] gap-px"
+              style={{
+                gridTemplateColumns: `repeat(${STATUS_ORDER.length}, minmax(0, 1fr))`,
+              }}
+            >
               {STATUS_ORDER.map((key, i) => (
                 <li key={key} className="relative pl-2">
                   <span className={`absolute left-0 top-0 h-3 w-px ${i === 0 ? "bg-[var(--mark)]" : "bg-[var(--rule-strong)]"}`} aria-hidden />
@@ -433,13 +462,20 @@ function Parcours() {
             </ol>
           </div>
         </div>
+
+        <Apercu
+          className="mt-16"
+          src={apercuStatuts}
+          legende={<>Fig. 03 - Les dossiers en cours, chacun à sa position dans l&apos;échelle ci-dessus. Copie d&apos;écran de l&apos;application, jeu de démonstration.</>}
+          alt="Liste des dossiers d'intervention dans GarageFlow. Six lignes, chacune avec son numéro de dossier, sa plaque, son véhicule, son client, son technicien, la date promise et son statut : Véhicule prêt, Contrôle final, Réceptionné, Attente pièces, Attente client, En réparation."
+        />
       </Shell>
     </section>
   );
 }
 
 /* ========================================================================== */
-/* 03 · Le contrôle — feuille d'inspection                                    */
+/* 03 · Le contrôle - feuille d'inspection                                    */
 /* ========================================================================== */
 
 /** États attribués pour la reproduction de feuille : mêmes libellés que le produit. */
@@ -469,6 +505,7 @@ function Controle() {
       <Shell>
         <Chapter
           n="03"
+          icon={ClipboardCheck}
           id="controle"
           title="La feuille de contrôle"
           standfirst="Dix-sept points imposés, toujours les mêmes. Ce qui n'a pas été regardé reste marqué « non contrôlé » : c'est une information, pas un oubli."
@@ -493,7 +530,12 @@ function Controle() {
                         <li key={item.key} className="leader py-1.5 text-sm">
                           <span>{item.label}</span>
                           <span className="leader__fill" aria-hidden />
-                          <span className={`tech text-[0.75rem] uppercase tracking-[0.06em] ${alerte ? "mark font-semibold" : "text-[var(--ink-soft)]"}`}>{etat}</span>
+                          <span className={`tech flex items-center gap-1.5 text-[0.75rem] uppercase tracking-[0.06em] ${alerte ? "mark font-semibold" : "text-[var(--ink-soft)]"}`}>
+                            {/* Sur une feuille de dix-sept lignes, la couleur seule
+                                ne suffit pas à retrouver ce qui demande une action. */}
+                            {alerte && <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden />}
+                            {etat}
+                          </span>
                         </li>
                       );
                     })}
@@ -519,6 +561,15 @@ function Controle() {
             </ul>
           </aside>
         </div>
+
+        <Apercu
+          className="mt-16"
+          src={apercuControle}
+          legende={
+            <>Fig. 04 - La même feuille dans l&apos;application : un état par point, la mesure relevée, une photo si nécessaire. Copie d&apos;écran, jeu de démonstration.</>
+          }
+          alt="Feuille de contrôle véhicule dans GarageFlow. Colonne Pneus et colonne Freins. Pour chaque point, cinq états au choix : OK, À surveiller, Recommandé, Urgent, Non contrôlé. Les plaquettes avant sont marquées Urgent avec la mesure 2 mm, les pneus arrière À surveiller avec 3 mm, les plaquettes arrière OK avec 7 mm. Un bouton Photo accompagne chaque point renseigné."
+        />
       </Shell>
     </section>
   );
@@ -528,9 +579,23 @@ function Controle() {
 /* 04 · La validation                                                         */
 /* ========================================================================== */
 
+/* Reprise fidèle de la décision réellement enregistrée sur le dossier
+   D-2026-0001 du jeu de démonstration, visible sur la copie d'écran ci-contre.
+   Ne pas inventer de montants ici : les deux doivent concorder. */
 const LIGNES = [
-  { t: "Remplacement plaquettes avant", u: "Urgent", p: "175,00 €", d: "Accepté" },
-  { t: "Vidange huile + filtre", u: "Recommandé", p: "110,00 €", d: "Refusé" },
+  {
+    t: "Remplacement plaquettes de frein avant",
+    u: "Urgent",
+    p: "175,00 €",
+    d: "Accepté",
+  },
+  { t: "Vidange huile + filtre", u: "Recommandé", p: "110,00 €", d: "Accepté" },
+  {
+    t: "Balais d'essuie-glace avant",
+    u: "À surveiller",
+    p: "45,48 €",
+    d: "Refusé",
+  },
 ];
 
 function Validation() {
@@ -539,19 +604,22 @@ function Validation() {
       <Shell>
         <Chapter
           n="04"
+          icon={PenLine}
           id="validation"
           title="La réponse du client, par écrit"
           standfirst="C'est la pièce qui manque à la plupart des ateliers : une trace de l'accord, ligne par ligne, datée."
         />
 
+        {/* Deux colonnes : à gauche ce que l'atelier conserve, à droite ce que
+            le client a réellement eu sous les yeux. */}
         <div className="mt-14 grid gap-14 md:grid-cols-12 md:gap-10">
-          <div className="md:col-span-5">
+          <div className="md:col-span-7">
             <p className="text-xl leading-[1.55]">
               Le client reçoit un lien. Il voit le diagnostic, les photos, le détail des prix. Il coche ce qu&apos;il autorise.
             </p>
             <blockquote className="rule-l mt-8 py-1 pl-5">
-              <p className="display display-m">« Les plaquettes oui, la vidange je la ferai plus tard. »</p>
-              <footer className="field-tag mt-3">Réponse enregistrée le 18/09 à 10:52</footer>
+              <p className="display display-m">« Les essuie-glaces, je les ferai moi-même. »</p>
+              <footer className="field-tag mt-3">Commentaire joint à la réponse, conservé dans le dossier</footer>
             </blockquote>
             <ul className="rule-t mt-8 pt-2">
               {[
@@ -566,52 +634,68 @@ function Validation() {
                 </li>
               ))}
             </ul>
+
+            {/* Pièce jointe : la réponse telle qu'elle est archivée */}
+            <figure className="mt-14 max-w-xl">
+              <div className="relative border border-[var(--rule-strong)] bg-white">
+                <div className="rule-b flex flex-wrap items-baseline justify-between gap-2 px-5 py-3">
+                  <span className="field-tag">Pièce jointe · Réponse client</span>
+                  <span className="tech text-[0.7rem] text-[var(--ink-soft)]">OR 2026-0001 · v1</span>
+                </div>
+
+                <div className="px-5 pb-12 pt-4">
+                  <p className="tech text-xs text-[var(--ink-soft)]">Jean Martin · Peugeot 308</p>
+
+                  <ul className="mt-4">
+                    {LIGNES.map((l) => (
+                      <li key={l.t} className="rule-b grid grid-cols-[1fr_auto] items-baseline gap-x-4 gap-y-1 py-3.5 first:border-t first:border-[var(--rule)]">
+                        <p className={`font-semibold ${l.d === "Refusé" ? "text-[var(--ink-soft)] line-through" : ""}`}>{l.t}</p>
+                        <p className="tech text-sm">{l.p}</p>
+                        <p className="field-tag">{l.u}</p>
+                        {/* Décision : le pictogramme double le mot, il ne le remplace pas. */}
+                        <p
+                          className={`tech flex items-center gap-1.5 text-[0.7rem] uppercase tracking-[0.1em] ${l.d === "Accepté" ? "mark font-semibold" : "text-[var(--ink-soft)]"}`}
+                        >
+                          {l.d === "Accepté" ? <Check className="h-3.5 w-3.5" aria-hidden /> : <X className="h-3.5 w-3.5" aria-hidden />}
+                          {l.d}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <div className="leader mt-5">
+                    <span className="field-tag text-[var(--ink)]">Montant accepté</span>
+                    <span className="leader__fill" aria-hidden />
+                    <span className="tech text-lg font-semibold">285,00 € TTC</span>
+                  </div>
+
+                  <div className="rule-t mt-6 grid grid-cols-2 gap-6 pt-4">
+                    <div>
+                      <p className="field-tag">Signé</p>
+                      <p className="mt-1 text-sm">Jean Martin</p>
+                    </div>
+                    <div>
+                      <p className="field-tag">Version</p>
+                      <p className="tech mt-1 text-sm">v1, verrouillée</p>
+                    </div>
+                  </div>
+                </div>
+
+                <span className="stamp absolute -bottom-4 right-6 bg-white">Accepté partiel</span>
+              </div>
+              <figcaption className="field-tag rule-t mt-9 pt-3">
+                Fig. 06 - Reproduction de la pièce archivée dans le dossier. L&apos;horodatage et l&apos;adresse IP y sont également conservés.
+              </figcaption>
+            </figure>
           </div>
 
-          {/* Pièce jointe : la réponse telle qu'elle est archivée */}
-          <figure className="md:col-span-6 md:col-start-7">
-            <div className="relative border border-[var(--rule-strong)] bg-white">
-              <div className="rule-b flex flex-wrap items-baseline justify-between gap-2 px-5 py-3">
-                <span className="field-tag">Pièce jointe · Réponse client</span>
-                <span className="tech text-[0.7rem] text-[var(--ink-soft)]">OR 2026-0001 · v1</span>
-              </div>
-
-              <div className="px-5 pb-12 pt-4">
-                <p className="tech text-xs text-[var(--ink-soft)]">Jean Martin · Peugeot 308</p>
-
-                <ul className="mt-4">
-                  {LIGNES.map((l) => (
-                    <li key={l.t} className="rule-b grid grid-cols-[1fr_auto] items-baseline gap-x-4 gap-y-1 py-3.5 first:border-t first:border-[var(--rule)]">
-                      <p className={`font-semibold ${l.d === "Refusé" ? "text-[var(--ink-soft)] line-through" : ""}`}>{l.t}</p>
-                      <p className="tech text-sm">{l.p}</p>
-                      <p className="field-tag">{l.u}</p>
-                      <p className={`tech text-[0.7rem] uppercase tracking-[0.1em] ${l.d === "Accepté" ? "mark font-semibold" : "text-[var(--ink-soft)]"}`}>{l.d}</p>
-                    </li>
-                  ))}
-                </ul>
-
-                <div className="leader mt-5">
-                  <span className="field-tag text-[var(--ink)]">Montant accepté</span>
-                  <span className="leader__fill" aria-hidden />
-                  <span className="tech text-lg font-semibold">175,00 € TTC</span>
-                </div>
-
-                <div className="rule-t mt-6 grid grid-cols-2 gap-6 pt-4">
-                  <div>
-                    <p className="field-tag">Signé</p>
-                    <p className="mt-1 text-sm">Jean Martin</p>
-                  </div>
-                  <div>
-                    <p className="field-tag">Horodatage</p>
-                    <p className="tech mt-1 text-sm">18/09/2026 10:52</p>
-                  </div>
-                </div>
-              </div>
-
-              <span className="stamp absolute -bottom-4 right-6 bg-white">Accepté partiel</span>
-            </div>
-            <figcaption className="field-tag rule-t mt-9 pt-3">Fig. 02 — Décision archivée dans le dossier, avec horodatage et adresse IP.</figcaption>
-          </figure>
+          <Apercu
+            telephone
+            className="md:col-span-4 md:col-start-9 md:self-start"
+            src={apercuClient}
+            legende={<>Fig. 05 - Le lien reçu par le client, sur son téléphone. Copie d&apos;écran de l&apos;application, jeu de démonstration.</>}
+            alt="Écran de validation reçu par le client sur son téléphone. En-tête du garage avec téléphone et adresse, puis « Bonjour Jean Martin », la Peugeot 308 GH-123-KL, 87 650 km, le motif de la visite. Le diagnostic du technicien liste trois constats avec leur niveau d'urgence et une photo. En bas, la réponse enregistrée et le détail des lignes acceptées et refusée."
+          />
         </div>
       </Shell>
     </section>
@@ -624,9 +708,24 @@ function Validation() {
 
 function Conditions() {
   const rows = [
-    { plan: `Essai ${TRIAL_DAYS} jours`, seats: `${PLANS.ATELIER.seats}`, commit: "Sans carte bancaire", price: "0 €" },
-    { plan: PLANS.ATELIER.name, seats: `${PLANS.ATELIER.seats}`, commit: "Sans engagement", price: formatPriceHt(PLANS.ATELIER) },
-    { plan: PLANS.RESEAU.name, seats: `${PLANS.RESEAU.seats}`, commit: "Sans engagement", price: formatPriceHt(PLANS.RESEAU) },
+    {
+      plan: `Essai ${TRIAL_DAYS} jours`,
+      seats: `${PLANS.ATELIER.seats}`,
+      commit: "Sans carte bancaire",
+      price: "0 €",
+    },
+    {
+      plan: PLANS.ATELIER.name,
+      seats: `${PLANS.ATELIER.seats}`,
+      commit: "Sans engagement",
+      price: formatPriceHt(PLANS.ATELIER),
+    },
+    {
+      plan: PLANS.RESEAU.name,
+      seats: `${PLANS.RESEAU.seats}`,
+      commit: "Sans engagement",
+      price: formatPriceHt(PLANS.RESEAU),
+    },
   ];
 
   return (
@@ -634,6 +733,7 @@ function Conditions() {
       <Shell>
         <Chapter
           n="05"
+          icon={Receipt}
           id="conditions"
           title="Un prix par garage, pas par dossier"
           standfirst="Dossiers, photos et diagnostics illimités dans les deux cas. Ce qui change, c'est le nombre de comptes ouverts."

@@ -24,22 +24,22 @@ const shortFmt = new Intl.DateTimeFormat("fr-FR", {
 });
 
 export function formatDateTime(d: Date | string | null | undefined): string {
-  if (!d) return "—";
+  if (!d) return "-";
   return dateTimeFmt.format(new Date(d));
 }
 
 export function formatDate(d: Date | string | null | undefined): string {
-  if (!d) return "—";
+  if (!d) return "-";
   return dateFmt.format(new Date(d));
 }
 
 export function formatShort(d: Date | string | null | undefined): string {
-  if (!d) return "—";
+  if (!d) return "-";
   return shortFmt.format(new Date(d));
 }
 
 export function formatKm(km: number | null | undefined): string {
-  if (km === null || km === undefined) return "—";
+  if (km === null || km === undefined) return "-";
   return `${new Intl.NumberFormat("fr-FR").format(km)} km`;
 }
 

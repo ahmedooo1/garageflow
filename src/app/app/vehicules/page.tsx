@@ -47,7 +47,7 @@ export default async function VehiclesPage({ searchParams }: { searchParams: Pro
                   {v.make} {v.model}
                 </p>
                 <p className="text-sm text-muted">
-                  {v.year ?? "—"} · {FUEL_LABELS[v.fuel]} · {formatKm(v.mileage)}
+                  {v.year ?? "-"} · {FUEL_LABELS[v.fuel]} · {formatKm(v.mileage)}
                 </p>
                 <p className="mt-1 text-sm text-ink-2">
                   {v.customer.lastName.toUpperCase()} {v.customer.firstName}
