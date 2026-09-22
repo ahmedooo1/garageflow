@@ -3,32 +3,35 @@ import { expect, test } from "@playwright/test";
 test("la page d'accueil présente le produit, le parcours et les tarifs", async ({ page }) => {
   await page.goto("/");
   await expect(page).toHaveTitle(/GarageFlow/);
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("la clé rendue");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("sous contrôle");
 
-  // Le sommaire annonce les chapitres du dossier.
-  const sommaire = page.getByRole("navigation", { name: "Sommaire" });
-  await expect(sommaire.getByRole("link", { name: /Le parcours/ })).toBeVisible();
-  await expect(sommaire.getByRole("link", { name: /Les conditions/ })).toBeVisible();
+  // La navigation annonce les sections de la page.
+  const sections = page.getByRole("navigation", { name: "Sections" });
+  await expect(sections.getByRole("link", { name: /Parcours/ })).toHaveAttribute("href", "/#parcours");
+  await expect(sections.getByRole("link", { name: /Tarifs/ })).toHaveAttribute("href", "/#tarifs");
 
   // Le parcours en huit étapes est décrit.
   await expect(page.getByRole("heading", { name: "Réception", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Validation client", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Validation", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Restitution", exact: true })).toBeVisible();
 
   // La feuille de contrôle reprend les points réels du produit.
-  const controle = page.locator("#controle").locator("..");
+  const controle = page.locator("#controle");
   await expect(controle).toContainText("Plaquettes avant");
   await expect(controle).toContainText("Essuie-glaces");
 
-  // Les formules sont présentées dans un tableau de tarifs.
-  const tarifs = page.getByRole("table", { name: "Tarifs GarageFlow" });
+  // Les deux formules et leurs prix, issus de la même source que la facturation.
+  const tarifs = page.locator("#tarifs");
   await expect(tarifs).toContainText("Atelier");
   await expect(tarifs).toContainText("Réseau");
   await expect(tarifs).toContainText("59 €");
   await expect(tarifs).toContainText("129 €");
 
-  // Les questions sont lisibles directement, sans dépliage.
-  await expect(page.getByRole("heading", { name: "Mes clients doivent-ils créer un compte ?" })).toBeVisible();
+  // Les questions sont des titres ; la réponse s'ouvre d'un clic ou au clavier.
+  const question = page.getByRole("heading", { name: "Mes clients doivent-ils créer un compte ?" });
+  await expect(question).toBeVisible();
+  await expect(page.getByText(/Ils reçoivent un lien personnel/)).toBeHidden();
+  await question.click();
   await expect(page.getByText(/Ils reçoivent un lien personnel/)).toBeVisible();
 });
 
@@ -43,23 +46,23 @@ test("l'action principale porte le même libellé partout et mène à l'inscript
   }
 
   // L'action secondaire reste une exploration, pas une inscription.
-  await expect(page.getByRole("link", { name: /Voir le parcours complet/ })).toHaveAttribute("href", "#parcours");
+  await expect(page.getByRole("link", { name: /Voir une journée d'atelier/ })).toHaveAttribute("href", "#parcours");
 
   await principal.nth(1).click();
   await expect(page).toHaveURL(/\/register/);
   await expect(page.getByRole("heading", { name: "Créer votre garage" })).toBeVisible();
 });
 
-test("le tableau de tarifs reste lisible sur mobile", async ({ page }) => {
+test("les tarifs restent lisibles sur mobile", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
-  const tarifs = page.getByRole("table", { name: "Tarifs GarageFlow" });
+  const tarifs = page.locator("#tarifs");
   await tarifs.scrollIntoViewIfNeeded();
 
-  // Chaque ligne reste associée à ses intitulés, empilée plutôt que compressée.
-  const ligneAtelier = tarifs.getByRole("row").filter({ hasText: "Atelier" });
-  await expect(ligneAtelier).toContainText("59 €");
-  await expect(ligneAtelier).toContainText("Engagement");
+  // Chaque formule garde son prix et son nombre de comptes à côté de son nom.
+  const atelier = tarifs.getByRole("article").filter({ hasText: "Atelier" }).first();
+  await expect(atelier).toContainText("59");
+  await expect(atelier).toContainText("5 comptes");
 
   // Aucun débordement horizontal de la page.
   const debordement = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -79,8 +82,10 @@ test("les copies d'écran du produit sont réellement chargées", async ({ page 
   });
 
   const captures = page.getByRole("img", { name: /GarageFlow|dossiers d'intervention|Feuille de contrôle|Écran de validation/ });
-  const total = await captures.count();
-  expect(total, "les cinq aperçus produit doivent être présents").toBe(5);
+  // Le tableau d'atelier et l'écran client apparaissent deux fois (ouverture
+  // puis section dédiée) : on compte les écrans distincts, pas les balises.
+  const sources = await captures.evaluateAll((n) => n.map((i) => (i as HTMLImageElement).currentSrc.replace(/&w=\d+/, "")));
+  expect(new Set(sources).size, "les cinq aperçus produit doivent être présents").toBe(5);
 
   // Une image cassée resterait invisible dans les autres assertions, qui ne
   // portent que sur du texte : on vérifie le décodage, pas la seule présence.
@@ -90,14 +95,14 @@ test("les copies d'écran du produit sont réellement chargées", async ({ page 
   }
 
   // Les légendes ne doivent pas promettre plus que ce que les images montrent.
-  await expect(page.locator("#dossier").locator("..")).toContainText("Copie d'écran de l'application");
+  await expect(page.locator("#atelier")).toContainText("copie d'écran de l'application");
 });
 
 test("la décision affichée correspond à celle du jeu de démonstration", async ({ page }) => {
   // La page reproduit une décision client réelle. Si le seed change, la
   // reproduction ment : ce test rend l'écart visible au lieu de le laisser passer.
   await page.goto("/");
-  const chapitre = page.locator("#validation").locator("..");
+  const chapitre = page.locator("#validation");
   await expect(chapitre).toContainText("285,00 € TTC");
   await expect(chapitre).toContainText("Remplacement plaquettes de frein avant");
   await expect(chapitre).toContainText("Balais d'essuie-glace avant");

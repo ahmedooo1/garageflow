@@ -2,13 +2,13 @@ import type { Metadata } from "next";
 import Image, { type StaticImageData } from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { AlertTriangle, Check, ClipboardCheck, LayoutGrid, PenLine, Receipt, Route, X } from "lucide-react";
+import { AlertTriangle, Check, X } from "lucide-react";
 import apercuAtelier from "./apercu-atelier.png";
 import apercuClient from "./apercu-client.png";
 import apercuControle from "./apercu-controle.png";
 import apercuDossier from "./apercu-dossier.png";
 import apercuStatuts from "./apercu-statuts.png";
-import { CHECKLIST_SECTIONS, STATUS_LABELS } from "@/lib/labels";
+import { CHECKLIST_ITEMS, CHECKLIST_SECTIONS, STATUS_LABELS } from "@/lib/labels";
 import { formatPriceHt, PLANS, TRIAL_DAYS } from "@/lib/plans";
 import { getSession } from "@/server/auth/session";
 import { PRIMARY_CTA } from "./layout";
@@ -26,12 +26,14 @@ export default async function LandingPage() {
   return (
     <>
       <Ouverture />
-      <Dossier />
+      <Chiffres />
+      <Promesse />
+      <Atelier />
       <Parcours />
       <Controle />
       <Validation />
-      <Conditions />
-      <Annexe />
+      <Tarifs />
+      <Questions />
       <Cloture />
     </>
   );
@@ -45,23 +47,25 @@ function Shell({ children, className = "" }: { children: React.ReactNode; classN
   return <div className={`mx-auto max-w-[84rem] px-5 sm:px-8 ${className}`}>{children}</div>;
 }
 
-/** En-tête de chapitre : numéro, pictogramme, titre, chapeau décalé à droite. */
-function Chapter({ n, id, title, standfirst, icon: Icon }: { n: string; id: string; title: string; standfirst: string; icon: React.ComponentType<{ className?: string }> }) {
+/** Repère de section : numéro orange, intitulé en capitales mono. */
+function Kicker({ n, children }: { n: string; children: React.ReactNode }) {
   return (
-    <header id={id} className="rule-heavy scroll-mt-16 pt-5">
-      <div className="grid gap-7 md:grid-cols-12 md:gap-8">
-        <div className="md:col-span-7">
-          <p className="field-tag flex items-center gap-2.5">
-            <span className="mark">§ {n}</span>
-            {/* Pictogramme de repérage, à la graisse du texte : il situe le
-                chapitre d'un coup d'œil dans le sommaire vertical. */}
-            <Icon className="h-3.5 w-3.5 text-[var(--ink-soft)]" aria-hidden />
-          </p>
-          <h2 className="display display-l mt-3">{title}</h2>
-        </div>
-        <p className="measure self-end text-[1.0625rem] leading-relaxed text-[var(--ink-soft)] md:col-span-4 md:col-start-9">{standfirst}</p>
-      </div>
-    </header>
+    <p className="field-tag flex items-center gap-3">
+      <span className="mark font-semibold">{n}</span>
+      <span className="h-px w-8 bg-[var(--rule-strong)]" aria-hidden />
+      <span>{children}</span>
+    </p>
+  );
+}
+
+function CtaPrincipal({ className = "" }: { className?: string }) {
+  return (
+    <Link href="/register" className={`action action--mark action--xl ${className}`}>
+      {PRIMARY_CTA}
+      <span className="action__arrow" aria-hidden>
+        →
+      </span>
+    </Link>
   );
 }
 
@@ -75,400 +79,353 @@ function PlateFr({ value, className = "" }: { value: string; className?: string 
   );
 }
 
-/**
- * Copie d'écran du produit, encadrée et légendée.
- *
- * Sous 768 px l'image garde une largeur fixe et défile horizontalement :
- * réduite à la largeur d'un téléphone, le texte des écrans serait illisible.
- * Les captures sont régénérées par `npm run capture:apercu`.
- */
-function Apercu({
+/* 68 plutôt que 75 : sur ces captures, 15 % de poids en moins pour une
+   différence invisible à la taille d'affichage (vérifié à l'agrandissement).
+   La valeur doit rester déclarée dans images.qualities de next.config.ts. */
+const QUALITE = 68;
+
+/** Capture posée sur son bloc orange décalé. */
+function Plan({
   src,
   alt,
-  legende,
+  sizes,
+  preload = false,
+  flip = false,
   className = "",
-  largeurMobile = "w-[52rem]",
-  telephone = false,
+  imageClassName = "block w-full",
 }: {
   src: StaticImageData;
   alt: string;
-  legende: React.ReactNode;
+  sizes: string;
+  preload?: boolean;
+  flip?: boolean;
   className?: string;
-  largeurMobile?: string;
-  /** L'écran du client est lu sur un téléphone : on le montre à sa taille. */
-  telephone?: boolean;
+  imageClassName?: string;
 }) {
-  const image = (
-    <Image
-      src={src}
-      alt={alt}
-      sizes={telephone ? "24rem" : "(min-width: 768px) 56rem, 52rem"}
-      /* 68 plutôt que 75 : sur ces captures, 15 % de poids en moins pour une
-         différence invisible à la taille d'affichage (vérifié à l'agrandissement). */
-      quality={68}
-      className={telephone ? "block w-full" : `block max-w-none md:w-full ${largeurMobile}`}
-    />
-  );
   return (
-    <figure className={`min-w-0 ${className}`}>
-      {telephone ? (
-        // Cadre sobre : l'épaisseur d'un téléphone, sans encoche ni reflet.
-        <div className="mx-auto w-full max-w-[22rem] rounded-[2rem] border-[10px] border-[#12151a] bg-[#12151a]">
-          <div className="overflow-hidden rounded-[1.4rem]">{image}</div>
-        </div>
-      ) : (
-        <div className="scrollbar-thin overflow-x-auto border border-[var(--rule-strong)]">{image}</div>
-      )}
-      {!telephone && <p className="scroll-note field-tag field-tag--xs mt-3">Faites glisser la copie d&apos;écran →</p>}
-      <figcaption className="field-tag rule-t mt-4 pt-3">{legende}</figcaption>
-    </figure>
+    <div className={`stage-shot ${flip ? "stage-shot--flip" : ""} ${className}`}>
+      <div className="stage-shot__frame">
+        <Image src={src} alt={alt} sizes={sizes} quality={QUALITE} preload={preload} loading={preload ? "eager" : undefined} className={imageClassName} />
+      </div>
+    </div>
   );
+}
+
+function Telephone({ className = "", sizes = "20rem" }: { className?: string; sizes?: string }) {
+  return (
+    <div className={`phone ${className}`}>
+      <div>
+        <Image
+          src={apercuClient}
+          sizes={sizes}
+          quality={QUALITE}
+          className="block w-full"
+          alt="Écran de validation reçu par le client sur son téléphone. En-tête du garage, puis « Bonjour Jean Martin », la Peugeot 308 GH-123-KL, 87 650 km, le motif de la visite. Le diagnostic du technicien liste trois constats avec leur niveau d'urgence et une photo. En bas, la réponse enregistrée : deux lignes acceptées, une refusée, 285,00 € TTC acceptés."
+        />
+      </div>
+    </div>
+  );
+}
+
+function Legende({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <p className={`field-tag field-tag--xs ${className}`}>{children}</p>;
 }
 
 /* ========================================================================== */
 /* Ouverture                                                                  */
 /* ========================================================================== */
 
-const FICHE = [
-  { k: "Destiné à", v: "Garages indépendants, 1 à 50 comptes" },
-  { k: "Périmètre", v: "Réception → diagnostic → restitution" },
-  { k: "Support", v: "Tablette d'atelier, ordinateur, téléphone" },
-  { k: "Mise en route", v: "Environ 15 minutes" },
-  { k: "Tarif", v: `À partir de ${formatPriceHt(PLANS.ATELIER)} HT par mois` },
-  { k: "Essai", v: `${TRIAL_DAYS} jours, sans carte bancaire` },
-];
+const STATUS_ORDER = Object.keys(STATUS_LABELS) as (keyof typeof STATUS_LABELS)[];
 
-const SOMMAIRE = [
-  {
-    n: "01",
-    href: "#dossier",
-    label: "Le dossier",
-    note: "Ce que l'atelier a sous les yeux",
-  },
-  {
-    n: "02",
-    href: "#parcours",
-    label: "Le parcours",
-    note: "Huit étapes, treize statuts",
-  },
-  {
-    n: "03",
-    href: "#controle",
-    label: "Le contrôle",
-    note: "Dix-sept points, quatre états",
-  },
-  {
-    n: "04",
-    href: "#validation",
-    label: "La validation",
-    note: "La réponse écrite du client",
-  },
-  {
-    n: "05",
-    href: "#conditions",
-    label: "Les conditions",
-    note: "Comptes, prix, engagement",
-  },
-];
+/* Journée type du jeu de démonstration : une plaque, une heure, un statut. */
+const DEPARTS = [
+  ["08:05", "GH-123-KL", "Réceptionné"],
+  ["08:20", "EZ-789-DE", "Diagnostic"],
+  ["09:10", "GH-123-KL", "Contrôle en cours"],
+  ["10:50", "EZ-789-DE", "Attente client"],
+  ["11:30", "DK-321-FG", "Attente pièces"],
+  ["13:15", "GH-123-KL", "En réparation"],
+  ["16:40", "GT-654-HJ", "Contrôle final"],
+  ["17:25", "GH-123-KL", "Véhicule restitué"],
+] as const;
 
 function Ouverture() {
   return (
-    <section className="pb-20 pt-10 sm:pt-14">
-      <Shell>
-        <p className="field-tag rule-b flex flex-wrap items-baseline justify-between gap-2 pb-3">
-          <span>Logiciel d&apos;atelier · Édition {new Date().getFullYear()}</span>
-          <span>France · Sans intelligence artificielle</span>
+    <section className="public-night relative overflow-hidden">
+      <Shell className="pt-12 sm:pt-20">
+        <p className="field-tag flex flex-wrap items-center gap-x-5 gap-y-2">
+          <span className="mark font-semibold">Logiciel d&apos;atelier</span>
+          <span>Garages indépendants</span>
+          <span className="hidden sm:inline">Édité en France</span>
         </p>
 
-        <h1 className="display display-xl mt-10 max-w-[18ch]">
-          L&apos;atelier sous contrôle, du client à <span className="mark-rule">la clé rendue</span>.
+        <h1 className="display-hero mt-7 sm:mt-9">
+          L&apos;atelier <br className="hidden sm:block" />
+          <span className="mark">sous contrôle.</span>
         </h1>
 
-        <div className="mt-12 grid gap-12 md:grid-cols-12 md:gap-8">
-          <div className="md:col-span-6">
-            <p className="measure text-xl leading-[1.5]">
-              Un véhicule entre. Il est photographié, diagnostiqué, chiffré. Le client accepte ou refuse chaque ligne, par écrit. L&apos;atelier ne
-              travaille que sur ce qui a été accepté.
-            </p>
-            <p className="measure mt-4 leading-relaxed text-[var(--ink-soft)]">
-              Plus de devis perdus sur un coin d&apos;établi, plus de « je n&apos;avais pas dit oui pour ça ».
+        <div className="mt-10 grid grid-cols-1 gap-14 pb-24 md:mt-14 md:grid-cols-12 md:gap-8 md:pb-32">
+          <div className="md:col-span-5 xl:col-span-4">
+            <p className="text-xl leading-[1.45] sm:text-[1.375rem]">
+              Réception photo, diagnostic, devis ligne par ligne. Le client répond par écrit depuis son téléphone. L&apos;atelier ne répare que ce qui a été
+              accepté.
             </p>
 
-            <div className="mt-9 flex flex-wrap items-center gap-x-8 gap-y-4">
-              <Link href="/register" className="action action--mark">
-                {PRIMARY_CTA}
-              </Link>
+            <div className="mt-9 flex flex-col items-start gap-5">
+              <CtaPrincipal />
               <Link href="#parcours" className="link-arrow">
-                Voir le parcours complet
+                Voir une journée d&apos;atelier
                 <span aria-hidden>↓</span>
               </Link>
             </div>
+
+            <dl className="rule-t mt-11 grid grid-cols-3 gap-4 pt-4">
+              {[
+                [`${TRIAL_DAYS} j`, "d'essai, sans carte"],
+                [`${PLANS.ATELIER.priceHt} €`, "HT par mois"],
+                ["15 min", "pour démarrer"],
+              ].map(([v, k]) => (
+                <div key={k}>
+                  <dt className="sr-only">{k}</dt>
+                  <dd className="display text-2xl">{v}</dd>
+                  <dd className="field-tag field-tag--xs mt-1.5 normal-case tracking-normal">{k}</dd>
+                </div>
+              ))}
+            </dl>
           </div>
 
-          {/* Fiche technique, comme l'en-tête d'un ordre de réparation. */}
-          <dl className="rule-t md:col-span-5 md:col-start-8">
-            {FICHE.map((row) => (
-              <div key={row.k} className="rule-b grid grid-cols-[7rem_1fr] gap-4 py-3 sm:grid-cols-[9rem_1fr]">
-                <dt className="field-tag pt-0.5">{row.k}</dt>
-                <dd className="text-sm leading-snug">{row.v}</dd>
-              </div>
-            ))}
-          </dl>
+          {/* Scène : le tableau d'atelier déborde à droite, le téléphone du
+              client passe devant. L'image est rognée par la section, jamais
+              par un défilement horizontal de la page. */}
+          <div className="relative min-h-[22rem] sm:min-h-[30rem] md:col-span-7 md:col-start-6 xl:col-span-8 xl:col-start-5">
+            <Plan
+              preload
+              className="w-[44rem] sm:w-[58rem] lg:w-[68rem]"
+              src={apercuAtelier}
+              sizes="(min-width: 1024px) 68rem, (min-width: 640px) 58rem, 44rem"
+              alt="Tableau d'atelier de GarageFlow : six véhicules en cours, deux en retard, un en attente client, un prêt à restituer. Couloirs À diagnostiquer, Diagnostic, Attente client, Attente pièces et À réparer, une carte par véhicule avec sa plaque, son client, son motif, son technicien et l'heure promise."
+            />
+            <Telephone
+              sizes="(min-width: 640px) 15rem, 10rem"
+              className="absolute -bottom-24 right-4 w-[8.5rem] sm:-bottom-16 sm:w-[11rem] md:left-[14rem] md:right-auto md:w-[14rem] lg:left-[16rem] xl:left-[30rem]"
+            />
+            <span className="stamp absolute left-6 top-[-1.25rem] hidden bg-[var(--paper)] sm:inline-block">
+              Accord client écrit
+            </span>
+          </div>
         </div>
+      </Shell>
 
-        <Apercu
-          className="mt-16"
-          src={apercuDossier}
-          largeurMobile="w-[64rem]"
-          alt="Fiche d'un dossier d'intervention dans GarageFlow : plaque GH-123-KL, Peugeot 308, statut En réparation, client Jean Martin, 87 650 km, technicien Karim Benali, restitution prévue le 22/09 à 17:00. En dessous, les sept photos de réception, les trois constats du technicien avec leur niveau d'urgence, et la décision du client ligne par ligne pour un montant accepté de 285,00 € TTC."
-          legende={<>Fig. 01 - Un dossier d&apos;intervention, tel qu&apos;il apparaît à l&apos;atelier. Copie d&apos;écran de l&apos;application, jeu de démonstration.</>}
-        />
+      {/* Tableau des départs : la journée qui défile. Décoratif, doublé en
+          clair par la section Parcours. */}
+      <div className="hazard h-2.5" aria-hidden />
+      <div className="ticker rule-b bg-[var(--paper-2)] py-3.5" aria-hidden>
+        <div className="ticker__track">
+          {[0, 1].map((k) => (
+            <div key={k} className="flex shrink-0">
+              {DEPARTS.map(([h, plaque, statut]) => (
+                <span key={`${k}-${h}`} className="tech flex items-center gap-3 pr-12 text-sm">
+                  <span className="text-[var(--ink-soft)]">{h}</span>
+                  <span className="border border-[var(--rule-strong)] px-1.5 font-semibold tracking-[0.08em]">{plaque}</span>
+                  <span className="uppercase tracking-[0.08em]">{statut}</span>
+                  <span className="mark" aria-hidden>
+                    ■
+                  </span>
+                </span>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
 
-        {/* Sommaire du dossier */}
-        <nav className="mt-20" aria-label="Sommaire">
-          <p className="field-tag rule-b pb-2">Sommaire</p>
-          <ul>
-            {SOMMAIRE.map((s) => (
-              <li key={s.n} className="rule-b">
-                <Link href={s.href} className="group grid grid-cols-[2.5rem_1fr] items-baseline gap-4 py-4 sm:grid-cols-[3.5rem_14rem_1fr]">
-                  <span className="tech text-sm text-[var(--ink-soft)] group-hover:text-[var(--mark)]">{s.n}</span>
-                  <span className="display text-xl group-hover:text-[var(--mark)]">{s.label}</span>
-                  <span className="col-span-2 text-sm text-[var(--ink-soft)] sm:col-span-1">{s.note}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
+/* ========================================================================== */
+/* Chiffres - uniquement ce que le produit fait réellement                    */
+/* ========================================================================== */
+
+function Chiffres() {
+  const chiffres = [
+    { n: "08", t: "étapes", d: "De la réception à la clé rendue, dans l'ordre réel du travail." },
+    { n: String(CHECKLIST_ITEMS.length), t: "points de contrôle", d: "Toujours les mêmes, pour chaque véhicule, sur tablette." },
+    { n: String(STATUS_ORDER.length), t: "statuts vérifiés", d: "Le serveur refuse les sauts d'étape. Pas de réparation sans accord." },
+    { n: "0", t: "intelligence artificielle", d: "Chaque constat et chaque prix est saisi par votre équipe." },
+  ];
+
+  return (
+    <section className="py-20 sm:py-28" aria-labelledby="chiffres-titre">
+      <Shell>
+        <h2 id="chiffres-titre" className="sr-only">
+          GarageFlow en chiffres
+        </h2>
+        <ul className="grid grid-cols-1 gap-y-14 sm:grid-cols-2 lg:grid-cols-4">
+          {chiffres.map((c, i) => (
+            <li key={c.t} className={`border-[var(--rule)] sm:pr-8 lg:pl-8 ${i > 0 ? "lg:border-l" : "lg:pl-0"} ${i % 2 === 1 ? "sm:border-l sm:pl-8" : ""}`}>
+              <p className={`figure-xxl text-[clamp(5rem,2rem+8vw,9.5rem)] ${i === 3 ? "mark" : "figure-outline"}`}>{c.n}</p>
+              <p className="display display-m mt-5">{c.t}</p>
+              <p className="mt-2 max-w-[30ch] text-[0.9375rem] leading-relaxed text-[var(--ink-soft)]">{c.d}</p>
+            </li>
+          ))}
+        </ul>
       </Shell>
     </section>
   );
 }
 
 /* ========================================================================== */
-/* 01 · Le dossier - planche annotée                                          */
+/* Promesse - la phrase que l'atelier n'entendra plus                         */
 /* ========================================================================== */
 
-/* Chaque note décrit un élément réellement visible sur la capture ci-contre.
-   Le « repère » nomme ce qu'il faut y chercher : pas d'annotation posée sur
-   l'image, qui se décalerait à la première recapture. */
+function Promesse() {
+  return (
+    <section className="rule-t py-20 sm:py-28">
+      <Shell>
+        <div className="grid grid-cols-1 gap-10 md:grid-cols-12 md:gap-8">
+          <p className="field-tag md:col-span-3 md:pt-4">Au comptoir, avant</p>
+          <div className="md:col-span-9">
+            <p className="display-shout">
+              « <span className="strike">Je n&apos;avais pas dit oui pour ça.</span> »
+            </p>
+            <div className="mt-12 grid grid-cols-1 gap-8 sm:grid-cols-2 sm:gap-12">
+              <p className="text-xl leading-[1.5]">
+                Avec GarageFlow, chaque ligne du devis porte la réponse du client : acceptée ou refusée, datée, verrouillée.
+              </p>
+              <p className="leading-relaxed text-[var(--ink-soft)]">
+                Plus de devis perdu sur un coin d&apos;établi, plus d&apos;accord donné au téléphone dont personne ne se souvient. La discussion au comptoir
+                s&apos;appuie sur une pièce écrite, photos à l&apos;appui.
+              </p>
+            </div>
+          </div>
+        </div>
+      </Shell>
+    </section>
+  );
+}
+
+/* ========================================================================== */
+/* 01 · L'atelier - planche annotée                                           */
+/* ========================================================================== */
+
+/* Chaque note décrit un élément réellement visible sur la capture. */
 const NOTES = [
-  {
-    n: "01",
-    t: "Un couloir par étape",
-    d: "Huit couloirs suivent l'ordre réel du travail, de la réception à la restitution. Un véhicule n'apparaît jamais à deux endroits.",
-    r: "Couloirs 1 à 5",
-  },
-  {
-    n: "02",
-    t: "La plaque d'abord",
-    d: "C'est ce qu'un compagnon cherche en entrant. Elle est en tête de carte, lisible à deux mètres.",
-    r: "GT-654-HJ",
-  },
-  {
-    n: "03",
-    t: "Le retard saute aux yeux",
-    d: "Passée l'heure promise, la carte prend un liseré rouge et le repère « Retard ». Le compteur en tête rassemble les dossiers concernés.",
-    r: "2 en retard",
-  },
-  {
-    n: "04",
-    t: "Qui a la voiture",
-    d: "Technicien et heure de restitution promise sur chaque carte. Le filtre en tête isole les dossiers d'un compagnon.",
-    r: "Karim Benali · 3",
-  },
+  { n: "01", t: "Un couloir par étape", d: "Les couloirs suivent l'ordre réel du travail. Un véhicule n'apparaît jamais à deux endroits." },
+  { n: "02", t: "La plaque d'abord", d: "C'est ce qu'un compagnon cherche en entrant. En tête de carte, lisible à deux mètres." },
+  { n: "03", t: "Le retard saute aux yeux", d: "Passée l'heure promise, la carte prend un liseré rouge. Le compteur rassemble les dossiers concernés." },
+  { n: "04", t: "Qui a la voiture", d: "Technicien et heure promise sur chaque carte. Un filtre isole les dossiers d'un compagnon." },
 ];
 
-function Dossier() {
+function Atelier() {
   return (
-    <section className="public-dark py-20 sm:py-28">
+    <section id="atelier" className="public-dark scroll-mt-16 overflow-hidden py-20 sm:py-32">
       <Shell>
-        <Chapter
-          n="01"
-          icon={LayoutGrid}
-          id="dossier"
-          title="Ce que l'atelier a sous les yeux"
-          standfirst="Un seul écran pour la journée. Il tient sur la tablette accrochée au mur et se lit depuis le pont."
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-12">
+          <div className="md:col-span-7">
+            <Kicker n="01">Le tableau d&apos;atelier</Kicker>
+            <h2 className="display-shout mt-6">Toute la journée sur un seul écran.</h2>
+          </div>
+          <p className="self-end text-lg leading-relaxed text-[var(--ink-soft)] md:col-span-4 md:col-start-9">
+            Il tient sur la tablette accrochée au mur et se lit depuis le pont. Chacun sait quelle voiture attend quoi, sans passer par le bureau.
+          </p>
+        </div>
+
+        {/* Pleine largeur, débordant à gauche : sur mobile, l'image est rognée
+            plutôt que réduite au point d'être illisible. */}
+        <Plan
+          flip
+          className="mt-16 w-[46rem] sm:w-[60rem] md:w-auto"
+          src={apercuAtelier}
+          sizes="(min-width: 768px) 84rem, 60rem"
+          alt="Tableau d'atelier de GarageFlow : quatre compteurs en tête (6 véhicules en cours, 2 en retard, 1 en attente client, 1 prêt à restituer), un filtre par technicien, puis les couloirs À diagnostiquer, Diagnostic, Attente client, Attente pièces et À réparer."
         />
 
-        <div className="mt-14 grid gap-12 md:grid-cols-12 md:gap-10">
-          {/* Notes en marge */}
-          <ol className="order-2 md:order-1 md:col-span-4">
-            {NOTES.map((note) => (
-              <li key={note.n} className="rule-b grid grid-cols-[2.5rem_1fr] gap-4 py-4 first:pt-0">
-                <span className="callout mt-0.5">{note.n}</span>
-                <div>
-                  <p className="display display-m">{note.t}</p>
-                  <p className="mt-1.5 text-sm leading-relaxed text-[var(--ink-soft)]">{note.d}</p>
-                  <p className="field-tag field-tag--xs mt-2">
-                    Repère <span className="tech ml-1.5 normal-case tracking-normal text-[var(--ink)]">{note.r}</span>
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ol>
+        <Legende className="mt-8">Tableau d&apos;atelier · copie d&apos;écran de l&apos;application, jeu de démonstration</Legende>
 
-          <Apercu
-            className="order-1 md:order-2 md:col-span-7 md:col-start-6"
-            src={apercuAtelier}
-            alt="Tableau d'atelier de GarageFlow : quatre compteurs en tête (6 véhicules en cours, 2 en retard, 1 en attente client, 1 prêt à restituer), un filtre par technicien, puis les couloirs À diagnostiquer, Diagnostic, Attente client, Attente pièces et À réparer. Chaque carte porte la plaque, le numéro de dossier, le véhicule, le client, le motif, le technicien et l'heure de restitution promise."
-            legende={
-              <>
-                Fig. 02 - Le tableau d&apos;atelier. Copie d&apos;écran de l&apos;application, jeu de démonstration. Six véhicules en cours ; les cinq premiers couloirs sur huit
-                sont visibles.
-              </>
-            }
-          />
-        </div>
+        <ol className="mt-16 grid grid-cols-1 gap-x-10 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
+          {NOTES.map((note) => (
+            <li key={note.n} className="rule-t pt-5">
+              <span className="callout">{note.n}</span>
+              <p className="display display-m mt-4">{note.t}</p>
+              <p className="mt-2 text-[0.9375rem] leading-relaxed text-[var(--ink-soft)]">{note.d}</p>
+            </li>
+          ))}
+        </ol>
       </Shell>
     </section>
   );
 }
 
 /* ========================================================================== */
-/* 02 · Le parcours                                                           */
+/* 02 · Le parcours - pointeuse                                               */
 /* ========================================================================== */
 
 const ETAPES = [
-  {
-    h: "08:05",
-    n: "01",
-    t: "Réception",
-    d: "Client, véhicule, kilométrage, motif. Photos sous tous les angles : les rayures déjà là sont actées avant l’entrée.",
-    inset: "plate" as const,
-  },
-  {
-    h: "08:20",
-    n: "02",
-    t: "Diagnostic",
-    d: "Le technicien saisit ses constats, avec un niveau d’urgence et des photos. Rien n’est généré automatiquement.",
-  },
-  {
-    h: "09:10",
-    n: "03",
-    t: "Contrôle",
-    d: "Dix-sept points imposés. Chacun reçoit un état, et si besoin un commentaire et une photo.",
-  },
-  {
-    h: "10:35",
-    n: "04",
-    t: "Proposition",
-    d: "Pièces, main-d’œuvre, TVA, total. Les montants sont calculés au centime, jamais en virgule flottante.",
-    inset: "prix" as const,
-  },
-  {
-    h: "10:50",
-    n: "05",
-    t: "Validation client",
-    d: "Un lien personnel part au client. Il accepte ou refuse, ligne par ligne. Sa réponse est horodatée et verrouillée.",
-  },
-  {
-    h: "13:15",
-    n: "06",
-    t: "Réparation",
-    d: "L'atelier ne voit que les lignes acceptées. Chacune est cochée quand elle est faite.",
-  },
-  {
-    h: "16:40",
-    n: "07",
-    t: "Contrôle final",
-    d: "Essai routier, niveaux, voyants, outils retirés. Sans ce contrôle, le véhicule ne passe pas « prêt ».",
-  },
-  {
-    h: "17:25",
-    n: "08",
-    t: "Restitution",
-    d: "Travaux réalisés, refusés, montant final, kilométrage de sortie. Le refus d’aujourd’hui sert au prochain passage.",
-  },
+  { h: "08:05", t: "Réception", d: "Client, véhicule, kilométrage, motif. Photos sous tous les angles : les rayures déjà là sont actées." },
+  { h: "08:20", t: "Diagnostic", d: "Le technicien saisit ses constats, avec un niveau d'urgence et des photos." },
+  { h: "09:10", t: "Contrôle", d: "Dix-sept points imposés. Chacun reçoit un état, un commentaire, une photo si besoin." },
+  { h: "10:35", t: "Proposition", d: "Pièces, main-d'œuvre, TVA. Les montants sont calculés au centime près." },
+  { h: "10:50", t: "Validation", d: "Un lien part au client. Il accepte ou refuse chaque ligne. Sa réponse est horodatée." },
+  { h: "13:15", t: "Réparation", d: "L'atelier ne voit que les lignes acceptées et coche chacune une fois faite." },
+  { h: "16:40", t: "Contrôle final", d: "Essai routier, niveaux, voyants. Sans lui, le véhicule ne passe pas « prêt »." },
+  { h: "17:25", t: "Restitution", d: "Travaux faits, refusés, montant final. Le refus d'aujourd'hui sert au prochain passage." },
 ];
-
-const STATUS_ORDER = Object.keys(STATUS_LABELS) as (keyof typeof STATUS_LABELS)[];
 
 function Parcours() {
   return (
-    <section className="py-20 sm:py-28">
+    <section id="parcours" className="scroll-mt-16 py-20 sm:py-32">
       <Shell>
-        <Chapter
-          n="02"
-          icon={Route}
-          id="parcours"
-          title="Une journée, huit étapes"
-          standfirst="Le serveur vérifie chaque passage d'une étape à l'autre. On ne saute pas le contrôle final, on ne répare pas ce qui n'a pas été accepté."
-        />
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-12">
+          <div className="md:col-span-12">
+            <Kicker n="02">Le parcours</Kicker>
+            <h2 className="display-shout mt-6">
+              08:05, la voiture entre. <br className="hidden lg:block" />
+              <span className="mark">17:25, la clé est rendue.</span>
+            </h2>
+          </div>
+        </div>
 
-        <ol className="mt-14">
-          {ETAPES.map((e) => (
-            <li key={e.n} className="rule-b grid grid-cols-[3.5rem_1fr] gap-x-5 gap-y-2 py-7 first:border-t first:border-[var(--rule)] md:grid-cols-12 md:gap-8">
-              <span className="tech pt-1 text-sm text-[var(--ink-soft)] md:col-span-1">{e.h}</span>
-              <h3 className="display display-m md:col-span-4 md:col-start-2">
-                <span className="mark tech mr-3 text-sm" aria-hidden>
-                  {e.n}
-                </span>
-                {e.t}
-              </h3>
-              <div className="col-span-2 md:col-span-6 md:col-start-7">
-                <p className="measure leading-relaxed text-[var(--ink-soft)]">{e.d}</p>
-                {e.inset === "plate" && (
-                  <p className="mt-4 flex flex-wrap items-center gap-3">
-                    <PlateFr value="GH-123-KL" className="text-xs" />
-                    <span className="tech text-xs text-[var(--ink-soft)]">87 650 km · entrée 08:05</span>
-                  </p>
-                )}
-                {e.inset === "prix" && (
-                  <dl className="rule-t mt-4 max-w-sm">
-                    {[
-                      ["Pièces HT", "62,50 €"],
-                      ["Main-d'œuvre HT", "83,33 €"],
-                      ["TVA 20 %", "29,17 €"],
-                    ].map(([k, v]) => (
-                      <div key={k} className="leader py-1.5">
-                        <dt className="field-tag">{k}</dt>
-                        <dd className="leader__fill" aria-hidden />
-                        <dd className="tech text-sm">{v}</dd>
-                      </div>
-                    ))}
-                    <div className="leader py-1.5">
-                      <dt className="field-tag text-[var(--ink)]">Total TTC</dt>
-                      <dd className="leader__fill" aria-hidden />
-                      <dd className="tech text-sm font-semibold">175,00 €</dd>
-                    </div>
-                  </dl>
-                )}
-              </div>
+        {/* Pointeuse : l'heure en grand, l'étape, puis le détail. Deux rangées
+            de quatre sur grand écran, une colonne continue sur téléphone. */}
+        <ol className="mt-16 grid grid-cols-1 border-t-2 border-[var(--ink)] sm:grid-cols-2 lg:grid-cols-4">
+          {ETAPES.map((e, i) => (
+            <li
+              key={e.h}
+              className={`group rule-b py-7 transition-colors hover:bg-[var(--paper-2)] sm:px-6 ${i % 2 === 1 ? "sm:border-l sm:border-l-[var(--rule)]" : ""} ${i % 4 !== 0 ? "lg:border-l lg:border-l-[var(--rule)]" : "lg:border-l-0"} ${i % 4 === 0 ? "sm:pl-0" : ""}`}
+            >
+              <p className="flex items-baseline justify-between gap-4">
+                <span className="tech text-3xl font-semibold tracking-tight group-hover:text-[var(--mark)] sm:text-4xl">{e.h}</span>
+                <span className="tech text-xs text-[var(--ink-soft)]">{String(i + 1).padStart(2, "0")}/08</span>
+              </p>
+              <h3 className="display display-m mt-5">{e.t}</h3>
+              <p className="mt-2 text-[0.9375rem] leading-relaxed text-[var(--ink-soft)]">{e.d}</p>
+              {i === 0 && (
+                <p className="mt-4">
+                  <PlateFr value="GH-123-KL" className="text-xs" />
+                </p>
+              )}
             </li>
           ))}
         </ol>
 
-        {/* Échelle des statuts */}
-        <div className="mt-16">
-          <p className="field-tag rule-b flex items-baseline justify-between pb-2">
-            <span>Échelle des statuts</span>
-            <span>{STATUS_ORDER.length} positions</span>
-          </p>
-          <p className="scroll-note field-tag field-tag--xs mt-3">Faites glisser l’échelle →</p>
-          <div className="scrollbar-thin overflow-x-auto pt-5">
-            <ol
-              className="grid min-w-[56rem] gap-px"
-              style={{
-                gridTemplateColumns: `repeat(${STATUS_ORDER.length}, minmax(0, 1fr))`,
-              }}
-            >
-              {STATUS_ORDER.map((key, i) => (
-                <li key={key} className="relative pl-2">
-                  <span className={`absolute left-0 top-0 h-3 w-px ${i === 0 ? "bg-[var(--mark)]" : "bg-[var(--rule-strong)]"}`} aria-hidden />
-                  <span className="tech block text-[0.6875rem] text-[var(--ink-soft)]">{String(i + 1).padStart(2, "0")}</span>
-                  <span className="mt-1 block pr-2 text-[0.75rem] leading-tight">{STATUS_LABELS[key]}</span>
-                </li>
-              ))}
-            </ol>
+        <div className="mt-20 grid grid-cols-1 items-end gap-10 md:grid-cols-12 md:gap-8">
+          <div className="md:col-span-4">
+            <p className="display display-l">Chaque véhicule a sa place dans l&apos;échelle.</p>
+            <p className="mt-4 leading-relaxed text-[var(--ink-soft)]">
+              {STATUS_ORDER.length} statuts, de « Réceptionné » à « Restitué ». La liste des dossiers montre en un coup d&apos;œil où en est chaque voiture.
+            </p>
+          </div>
+          <div className="min-w-0 md:col-span-8">
+            <div className="scrollbar-thin overflow-x-auto">
+              <Plan
+                className="w-[48rem] md:w-auto"
+                src={apercuStatuts}
+                sizes="(min-width: 768px) 56rem, 48rem"
+                alt="Liste des dossiers d'intervention dans GarageFlow. Six lignes, chacune avec son numéro de dossier, sa plaque, son véhicule, son client, son technicien, la date promise et son statut : Véhicule prêt, Contrôle final, Réceptionné, Attente pièces, Attente client, En réparation."
+              />
+            </div>
+            <Legende className="mt-5">Liste des dossiers · copie d&apos;écran de l&apos;application, jeu de démonstration</Legende>
           </div>
         </div>
-
-        <Apercu
-          className="mt-16"
-          src={apercuStatuts}
-          legende={<>Fig. 03 - Les dossiers en cours, chacun à sa position dans l&apos;échelle ci-dessus. Copie d&apos;écran de l&apos;application, jeu de démonstration.</>}
-          alt="Liste des dossiers d'intervention dans GarageFlow. Six lignes, chacune avec son numéro de dossier, sa plaque, son véhicule, son client, son technicien, la date promise et son statut : Véhicule prêt, Contrôle final, Réceptionné, Attente pièces, Attente client, En réparation."
-        />
       </Shell>
     </section>
   );
@@ -478,7 +435,6 @@ function Parcours() {
 /* 03 · Le contrôle - feuille d'inspection                                    */
 /* ========================================================================== */
 
-/** États attribués pour la reproduction de feuille : mêmes libellés que le produit. */
 const ETATS: Record<string, string> = {
   TIRE_FL: "OK",
   TIRE_FR: "OK",
@@ -501,201 +457,157 @@ const ETATS: Record<string, string> = {
 
 function Controle() {
   return (
-    <section className="py-20 sm:py-28">
+    <section id="controle" className="public-dark scroll-mt-16 overflow-hidden py-20 sm:py-32">
       <Shell>
-        <Chapter
-          n="03"
-          icon={ClipboardCheck}
-          id="controle"
-          title="La feuille de contrôle"
-          standfirst="Dix-sept points imposés, toujours les mêmes. Ce qui n'a pas été regardé reste marqué « non contrôlé » : c'est une information, pas un oubli."
-        />
+        <div className="grid grid-cols-1 gap-16 lg:grid-cols-12 lg:gap-10">
+          <div className="lg:col-span-5">
+            <Kicker n="03">Le contrôle</Kicker>
+            <h2 className="display-shout mt-6">
+              {CHECKLIST_ITEMS.length} points. <span className="mark">Aucun oubli.</span>
+            </h2>
+            <p className="mt-6 text-lg leading-relaxed text-[var(--ink-soft)]">
+              Toujours les mêmes, pour chaque véhicule. Ce qui n&apos;a pas été regardé reste marqué « non contrôlé » : c&apos;est une information, pas un
+              oubli.
+            </p>
 
-        <div className="mt-14 grid gap-12 md:grid-cols-12 md:gap-10">
-          <div className="md:col-span-8">
-            <div className="rule-heavy flex flex-wrap items-baseline justify-between gap-3 pt-3">
-              <p className="display display-m">Contrôle véhicule</p>
-              <p className="tech text-xs text-[var(--ink-soft)]">OR 2026-0001 · GH-123-KL · 87 650 km · 09:10</p>
-            </div>
-
-            <div className="mt-6 sm:columns-2 sm:gap-x-12">
-              {CHECKLIST_SECTIONS.map((section) => (
-                <div key={section.section} className="mb-8 break-inside-avoid">
-                  <p className="field-tag rule-b pb-1.5">{section.section}</p>
-                  <ul className="mt-2">
-                    {section.items.map((item) => {
-                      const etat = ETATS[item.key] ?? "Non contrôlé";
-                      const alerte = etat === "Urgent" || etat === "Recommandé";
-                      return (
-                        <li key={item.key} className="leader py-1.5 text-sm">
-                          <span>{item.label}</span>
-                          <span className="leader__fill" aria-hidden />
-                          <span className={`tech flex items-center gap-1.5 text-[0.75rem] uppercase tracking-[0.06em] ${alerte ? "mark font-semibold" : "text-[var(--ink-soft)]"}`}>
-                            {/* Sur une feuille de dix-sept lignes, la couleur seule
-                                ne suffit pas à retrouver ce qui demande une action. */}
-                            {alerte && <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden />}
-                            {etat}
-                          </span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              ))}
-            </div>
           </div>
 
-          <aside className="rule-t pt-5 md:col-span-3 md:col-start-10">
-            <p className="field-tag">Lecture</p>
-            <p className="mt-3 text-sm leading-relaxed text-[var(--ink-soft)]">
-              Cinq niveaux d&apos;urgence, du simple constat au critique. Ils suivent le point jusque dans la proposition envoyée au client, qui voit donc
-              la même hiérarchie que l&apos;atelier.
-            </p>
-            <ul className="rule-t mt-5 pt-3">
-              {["Information", "À surveiller", "Recommandé", "Urgent", "Critique"].map((u, i) => (
-                <li key={u} className="tech flex items-baseline gap-3 py-1 text-xs">
-                  <span className="text-[var(--ink-soft)]">{String(i + 1).padStart(2, "0")}</span>
-                  <span className={i >= 3 ? "mark" : ""}>{u}</span>
-                </li>
-              ))}
-            </ul>
-          </aside>
+          {/* Deux écrans superposés : le dossier complet en fond, la feuille
+              de contrôle devant, décalée vers le bas. */}
+          <div className="relative lg:col-span-7">
+            <div className="scrollbar-thin overflow-x-auto lg:overflow-visible">
+              <Plan
+                className="w-[46rem] lg:w-[125%]"
+                src={apercuDossier}
+                sizes="(min-width: 1024px) 64rem, 46rem"
+                alt="Fiche d'un dossier d'intervention dans GarageFlow : plaque GH-123-KL, Peugeot 308, statut En réparation, client Jean Martin, 87 650 km, technicien Karim Benali, restitution prévue le 22/09 à 17:00. En dessous, les photos de réception, les constats du technicien et la décision du client ligne par ligne."
+              />
+            </div>
+            <div className="mt-10 lg:-mt-40 lg:ml-[-4rem] lg:mr-10">
+              <div className="scrollbar-thin overflow-x-auto lg:overflow-visible">
+                <Plan
+                  flip
+                  className="w-[44rem] lg:w-auto"
+                  src={apercuControle}
+                  sizes="(min-width: 1024px) 44rem, 44rem"
+                  alt="Feuille de contrôle véhicule dans GarageFlow. Pour chaque point, cinq états au choix : OK, À surveiller, Recommandé, Urgent, Non contrôlé. Les plaquettes avant sont marquées Urgent avec la mesure 2 mm, les pneus arrière À surveiller avec 3 mm. Un bouton Photo accompagne chaque point renseigné."
+                />
+              </div>
+              <Legende className="mt-6">Dossier et feuille de contrôle · copies d&apos;écran de l&apos;application, jeu de démonstration</Legende>
+            </div>
+          </div>
         </div>
 
-        <Apercu
-          className="mt-16"
-          src={apercuControle}
-          legende={
-            <>Fig. 04 - La même feuille dans l&apos;application : un état par point, la mesure relevée, une photo si nécessaire. Copie d&apos;écran, jeu de démonstration.</>
-          }
-          alt="Feuille de contrôle véhicule dans GarageFlow. Colonne Pneus et colonne Freins. Pour chaque point, cinq états au choix : OK, À surveiller, Recommandé, Urgent, Non contrôlé. Les plaquettes avant sont marquées Urgent avec la mesure 2 mm, les pneus arrière À surveiller avec 3 mm, les plaquettes arrière OK avec 7 mm. Un bouton Photo accompagne chaque point renseigné."
-        />
+        {/* Feuille de contrôle recomposée, mêmes libellés que le produit. */}
+        <div className="mt-24 border-t-2 border-[var(--ink)] pt-3 lg:mt-32">
+          <p className="tech flex flex-wrap justify-between gap-2 text-xs text-[var(--ink-soft)]">
+            <span>Feuille de contrôle · OR 2026-0001 · GH-123-KL</span>
+            <span>Mêmes libellés que dans l&apos;application</span>
+          </p>
+          <div className="mt-5 sm:columns-2 sm:gap-x-10 lg:columns-4">
+            {CHECKLIST_SECTIONS.map((section) => (
+              <div key={section.section} className="mb-6 break-inside-avoid">
+                <p className="field-tag rule-b pb-1.5">{section.section}</p>
+                <ul className="mt-1.5">
+                  {section.items.map((item) => {
+                    const etat = ETATS[item.key] ?? "Non contrôlé";
+                    const alerte = etat === "Urgent" || etat === "Recommandé";
+                    return (
+                      <li key={item.key} className="leader py-1 text-[0.8125rem]">
+                        <span>{item.label}</span>
+                        <span className="leader__fill" aria-hidden />
+                        <span className={`tech flex items-center gap-1 text-[0.6875rem] uppercase tracking-[0.06em] ${alerte ? "mark font-semibold" : "text-[var(--ink-soft)]"}`}>
+                          {/* La couleur seule ne suffit pas : le pictogramme double l'alerte. */}
+                          {alerte && <AlertTriangle className="h-3 w-3 shrink-0" aria-hidden />}
+                          {etat}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </div>
       </Shell>
     </section>
   );
 }
 
 /* ========================================================================== */
-/* 04 · La validation                                                         */
+/* 04 · La validation - bloc orange                                           */
 /* ========================================================================== */
 
-/* Reprise fidèle de la décision réellement enregistrée sur le dossier
-   D-2026-0001 du jeu de démonstration, visible sur la copie d'écran ci-contre.
-   Ne pas inventer de montants ici : les deux doivent concorder. */
+/* Reprise fidèle de la décision enregistrée sur le dossier D-2026-0001 du jeu
+   de démonstration, visible sur l'écran du téléphone. Les deux doivent concorder. */
 const LIGNES = [
-  {
-    t: "Remplacement plaquettes de frein avant",
-    u: "Urgent",
-    p: "175,00 €",
-    d: "Accepté",
-  },
+  { t: "Remplacement plaquettes de frein avant", u: "Urgent", p: "175,00 €", d: "Accepté" },
   { t: "Vidange huile + filtre", u: "Recommandé", p: "110,00 €", d: "Accepté" },
-  {
-    t: "Balais d'essuie-glace avant",
-    u: "À surveiller",
-    p: "45,48 €",
-    d: "Refusé",
-  },
+  { t: "Balais d'essuie-glace avant", u: "À surveiller", p: "45,48 €", d: "Refusé" },
 ];
 
 function Validation() {
   return (
-    <section className="py-20 sm:py-28">
-      <Shell>
-        <Chapter
-          n="04"
-          icon={PenLine}
-          id="validation"
-          title="La réponse du client, par écrit"
-          standfirst="C'est la pièce qui manque à la plupart des ateliers : une trace de l'accord, ligne par ligne, datée."
-        />
-
-        {/* Deux colonnes : à gauche ce que l'atelier conserve, à droite ce que
-            le client a réellement eu sous les yeux. */}
-        <div className="mt-14 grid gap-14 md:grid-cols-12 md:gap-10">
+    <section id="validation" className="public-signal scroll-mt-16 overflow-hidden">
+      <div className="hazard h-2.5" aria-hidden />
+      <Shell className="py-20 sm:py-32">
+        <div className="grid grid-cols-1 gap-16 md:grid-cols-12 md:gap-8">
           <div className="md:col-span-7">
-            <p className="text-xl leading-[1.55]">
-              Le client reçoit un lien. Il voit le diagnostic, les photos, le détail des prix. Il coche ce qu&apos;il autorise.
+            <Kicker n="04">La validation client</Kicker>
+            <h2 className="display-shout mt-6">Le client dit oui. Par écrit. Ligne par ligne.</h2>
+            <p className="mt-8 max-w-[46ch] text-xl leading-[1.5]">
+              Il reçoit un lien sur son téléphone. Il voit le diagnostic, les photos, le détail des prix, et coche ce qu&apos;il autorise.
             </p>
-            <blockquote className="rule-l mt-8 py-1 pl-5">
+
+            <blockquote className="mt-10 border-l-2 border-[var(--ink)] pl-5">
               <p className="display display-m">« Les essuie-glaces, je les ferai moi-même. »</p>
               <footer className="field-tag mt-3">Commentaire joint à la réponse, conservé dans le dossier</footer>
             </blockquote>
-            <ul className="rule-t mt-8 pt-2">
+
+            {/* La pièce archivée : ce que l'atelier garde en cas de litige. */}
+            <div className="relative mt-12 max-w-xl bg-[#f4f3f0] text-[#14181d]">
+              <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-[#d7d4cc] px-5 py-3">
+                <span className="tech text-[0.7rem] uppercase tracking-[0.13em] text-[#4b525b]">Réponse client archivée</span>
+                <span className="tech text-[0.7rem] text-[#4b525b]">D-2026-0001 · v1 verrouillée</span>
+              </div>
+              <ul className="px-5">
+                {LIGNES.map((l) => (
+                  <li key={l.t} className="grid grid-cols-[1fr_auto] items-baseline gap-x-4 gap-y-0.5 border-b border-[#d7d4cc] py-3">
+                    <p className={`font-semibold ${l.d === "Refusé" ? "text-[#4b525b] line-through" : ""}`}>{l.t}</p>
+                    <p className="tech text-sm">{l.p}</p>
+                    <p className="tech text-[0.7rem] uppercase tracking-[0.1em] text-[#4b525b]">{l.u}</p>
+                    <p className={`tech flex items-center gap-1 text-[0.7rem] font-semibold uppercase tracking-[0.1em] ${l.d === "Accepté" ? "text-[#b3440a]" : "text-[#4b525b]"}`}>
+                      {l.d === "Accepté" ? <Check className="h-3.5 w-3.5" aria-hidden /> : <X className="h-3.5 w-3.5" aria-hidden />}
+                      {l.d}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+              <div className="flex items-baseline justify-between gap-4 px-5 pb-10 pt-4">
+                <span className="tech text-[0.7rem] uppercase tracking-[0.13em]">Montant accepté</span>
+                <span className="tech text-xl font-semibold">285,00 € TTC</span>
+              </div>
+              <span className="stamp absolute -bottom-4 right-6 border-[#b3440a] bg-[#f4f3f0] text-[#b3440a]">Accepté partiel</span>
+            </div>
+
+            <ul className="mt-16 grid grid-cols-1 gap-x-10 gap-y-6 sm:grid-cols-2">
               {[
                 ["Aucun compte à créer", "Ni inscription, ni application à installer."],
                 ["Acceptation partielle", "Il valide une ligne, refuse l'autre. L'atelier sait quoi faire."],
-                ["Verrouillé après réponse", "Une proposition validée ne bouge plus. Pour changer, on crée une version."],
-                ["Lien à durée limitée", "Jeton aléatoire, expiration configurable, révocable depuis le dossier."],
+                ["Verrouillé après réponse", "Pour changer une proposition validée, on en crée une nouvelle version."],
+                ["Lien à durée limitée", "Jeton aléatoire, expiration réglable, révocable depuis le dossier."],
               ].map(([t, d]) => (
-                <li key={t} className="rule-b py-3.5">
-                  <p className="font-semibold">{t}</p>
-                  <p className="mt-0.5 text-sm leading-relaxed text-[var(--ink-soft)]">{d}</p>
+                <li key={t} className="border-t-2 border-[var(--ink)] pt-3">
+                  <p className="font-bold">{t}</p>
+                  <p className="mt-1 text-[0.9375rem] leading-relaxed text-[var(--ink-soft)]">{d}</p>
                 </li>
               ))}
             </ul>
-
-            {/* Pièce jointe : la réponse telle qu'elle est archivée */}
-            <figure className="mt-14 max-w-xl">
-              <div className="relative border border-[var(--rule-strong)] bg-white">
-                <div className="rule-b flex flex-wrap items-baseline justify-between gap-2 px-5 py-3">
-                  <span className="field-tag">Pièce jointe · Réponse client</span>
-                  <span className="tech text-[0.7rem] text-[var(--ink-soft)]">OR 2026-0001 · v1</span>
-                </div>
-
-                <div className="px-5 pb-12 pt-4">
-                  <p className="tech text-xs text-[var(--ink-soft)]">Jean Martin · Peugeot 308</p>
-
-                  <ul className="mt-4">
-                    {LIGNES.map((l) => (
-                      <li key={l.t} className="rule-b grid grid-cols-[1fr_auto] items-baseline gap-x-4 gap-y-1 py-3.5 first:border-t first:border-[var(--rule)]">
-                        <p className={`font-semibold ${l.d === "Refusé" ? "text-[var(--ink-soft)] line-through" : ""}`}>{l.t}</p>
-                        <p className="tech text-sm">{l.p}</p>
-                        <p className="field-tag">{l.u}</p>
-                        {/* Décision : le pictogramme double le mot, il ne le remplace pas. */}
-                        <p
-                          className={`tech flex items-center gap-1.5 text-[0.7rem] uppercase tracking-[0.1em] ${l.d === "Accepté" ? "mark font-semibold" : "text-[var(--ink-soft)]"}`}
-                        >
-                          {l.d === "Accepté" ? <Check className="h-3.5 w-3.5" aria-hidden /> : <X className="h-3.5 w-3.5" aria-hidden />}
-                          {l.d}
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
-
-                  <div className="leader mt-5">
-                    <span className="field-tag text-[var(--ink)]">Montant accepté</span>
-                    <span className="leader__fill" aria-hidden />
-                    <span className="tech text-lg font-semibold">285,00 € TTC</span>
-                  </div>
-
-                  <div className="rule-t mt-6 grid grid-cols-2 gap-6 pt-4">
-                    <div>
-                      <p className="field-tag">Signé</p>
-                      <p className="mt-1 text-sm">Jean Martin</p>
-                    </div>
-                    <div>
-                      <p className="field-tag">Version</p>
-                      <p className="tech mt-1 text-sm">v1, verrouillée</p>
-                    </div>
-                  </div>
-                </div>
-
-                <span className="stamp absolute -bottom-4 right-6 bg-white">Accepté partiel</span>
-              </div>
-              <figcaption className="field-tag rule-t mt-9 pt-3">
-                Fig. 06 - Reproduction de la pièce archivée dans le dossier. L&apos;horodatage et l&apos;adresse IP y sont également conservés.
-              </figcaption>
-            </figure>
           </div>
 
-          <Apercu
-            telephone
-            className="md:col-span-4 md:col-start-9 md:self-start"
-            src={apercuClient}
-            legende={<>Fig. 05 - Le lien reçu par le client, sur son téléphone. Copie d&apos;écran de l&apos;application, jeu de démonstration.</>}
-            alt="Écran de validation reçu par le client sur son téléphone. En-tête du garage avec téléphone et adresse, puis « Bonjour Jean Martin », la Peugeot 308 GH-123-KL, 87 650 km, le motif de la visite. Le diagnostic du technicien liste trois constats avec leur niveau d'urgence et une photo. En bas, la réponse enregistrée et le détail des lignes acceptées et refusée."
-          />
+          <div className="md:col-span-4 md:col-start-9">
+            <Telephone className="mx-auto w-full max-w-[21rem] md:sticky md:top-24" sizes="21rem" />
+          </div>
         </div>
       </Shell>
     </section>
@@ -703,101 +615,62 @@ function Validation() {
 }
 
 /* ========================================================================== */
-/* 05 · Les conditions                                                        */
+/* 05 · Les tarifs                                                            */
 /* ========================================================================== */
 
-function Conditions() {
-  const rows = [
-    {
-      plan: `Essai ${TRIAL_DAYS} jours`,
-      seats: `${PLANS.ATELIER.seats}`,
-      commit: "Sans carte bancaire",
-      price: "0 €",
-    },
-    {
-      plan: PLANS.ATELIER.name,
-      seats: `${PLANS.ATELIER.seats}`,
-      commit: "Sans engagement",
-      price: formatPriceHt(PLANS.ATELIER),
-    },
-    {
-      plan: PLANS.RESEAU.name,
-      seats: `${PLANS.RESEAU.seats}`,
-      commit: "Sans engagement",
-      price: formatPriceHt(PLANS.RESEAU),
-    },
+function Tarifs() {
+  const formules = [
+    { plan: PLANS.ATELIER, pour: "Un garage indépendant et son équipe." },
+    { plan: PLANS.RESEAU, pour: "Les structures à forte rotation, plusieurs ateliers." },
   ];
 
   return (
-    <section className="py-20 sm:py-28">
+    <section id="tarifs" className="public-night scroll-mt-16 py-20 sm:py-32">
       <Shell>
-        <Chapter
-          n="05"
-          icon={Receipt}
-          id="conditions"
-          title="Un prix par garage, pas par dossier"
-          standfirst="Dossiers, photos et diagnostics illimités dans les deux cas. Ce qui change, c'est le nombre de comptes ouverts."
-        />
-
-        <div className="mt-14 grid gap-12 md:grid-cols-12 md:gap-10">
-          <div className="md:col-span-8">
-            {/* Sous 640px, les lignes s'empilent en fiches ; les rôles ARIA
-                explicites conservent la sémantique de tableau. */}
-            <table className="ledger" role="table">
-              <caption className="sr-only">Tarifs GarageFlow</caption>
-              <thead role="rowgroup">
-                <tr className="field-tag" role="row">
-                  <th scope="col" role="columnheader">
-                    Formule
-                  </th>
-                  <th scope="col" role="columnheader">
-                    Comptes actifs
-                  </th>
-                  <th scope="col" role="columnheader">
-                    Engagement
-                  </th>
-                  <th scope="col" role="columnheader">
-                    Prix HT / mois
-                  </th>
-                </tr>
-              </thead>
-              <tbody role="rowgroup">
-                {rows.map((r) => (
-                  <tr key={r.plan} role="row">
-                    <th scope="row" role="rowheader" className="display text-xl font-bold">
-                      {r.plan}
-                    </th>
-                    <td role="cell" className="tech text-sm">
-                      <span className="cell-tag field-tag field-tag--xs">Comptes</span>
-                      {r.seats}
-                    </td>
-                    <td role="cell" className="text-sm text-[var(--ink-soft)]">
-                      <span className="cell-tag field-tag field-tag--xs">Engagement</span>
-                      {r.commit}
-                    </td>
-                    <td role="cell" className="tech whitespace-nowrap text-lg font-semibold">
-                      <span className="cell-tag field-tag field-tag--xs">Prix HT / mois</span>
-                      {r.price}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            <p className="mt-9">
-              <Link href="/register" className="action action--mark">
-                {PRIMARY_CTA}
-              </Link>
-            </p>
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-12">
+          <div className="md:col-span-7">
+            <Kicker n="05">Les tarifs</Kicker>
+            <h2 className="display-shout mt-6">Un prix par garage. Pas par dossier.</h2>
           </div>
+          <p className="self-end text-lg leading-relaxed text-[var(--ink-soft)] md:col-span-4 md:col-start-9">
+            Dossiers, photos et diagnostics illimités dans les deux formules. Seul le nombre de comptes change. Sans engagement.
+          </p>
+        </div>
 
-          <aside className="rule-t pt-5 md:col-span-3 md:col-start-10">
-            <p className="field-tag">À la fin de l&apos;essai</p>
-            <p className="mt-3 text-sm leading-relaxed text-[var(--ink-soft)]">
-              Rien n&apos;est supprimé. Les dossiers restent consultables et exportables au format JSON. Seule la création de nouvelles données est
-              suspendue tant qu&apos;aucun abonnement n&apos;est choisi.
-            </p>
-          </aside>
+        <div className="mt-16 grid grid-cols-1 border-t-2 border-[var(--ink)] md:grid-cols-2">
+          {formules.map(({ plan, pour }, i) => (
+            <article key={plan.key} className={`py-10 ${i === 1 ? "rule-t md:border-l md:border-t-0 md:border-l-[var(--rule)] md:pl-10" : "md:pr-10"}`}>
+              <p className="flex items-baseline justify-between gap-4">
+                <span className="display text-3xl">{plan.name}</span>
+                <span className="field-tag">Jusqu&apos;à {plan.seats} comptes</span>
+              </p>
+              <p className="mt-2 text-[var(--ink-soft)]">{pour}</p>
+              <p className="mt-10 flex flex-wrap items-baseline gap-x-3 gap-y-2">
+                <span className={`figure-xxl text-[clamp(4rem,1.5rem+4.6vw,6.75rem)] ${i === 0 ? "mark" : ""}`}>{plan.priceHt}&nbsp;€</span>
+                <span className="field-tag whitespace-nowrap">HT / mois</span>
+              </p>
+              <ul className="mt-10">
+                {plan.features.map((f) => (
+                  <li key={f} className="rule-b flex items-baseline gap-3 py-2.5 text-[0.9375rem]">
+                    <Check className="mark h-4 w-4 shrink-0 translate-y-0.5" aria-hidden />
+                    {f}
+                  </li>
+                ))}
+              </ul>
+            </article>
+          ))}
+        </div>
+
+        <div className="hazard mt-4 h-1.5" aria-hidden />
+        <div className="mt-10 flex flex-col items-start justify-between gap-8 md:flex-row md:items-center">
+          <p className="max-w-[48ch] text-lg leading-relaxed">
+            <span className="font-bold">{TRIAL_DAYS} jours d&apos;essai, sans carte bancaire.</span>{" "}
+            <span className="text-[var(--ink-soft)]">
+              À la fin de l&apos;essai, rien n&apos;est supprimé : vos dossiers restent consultables et exportables. Prix affichés {formatPriceHt(PLANS.ATELIER)} et{" "}
+              {formatPriceHt(PLANS.RESEAU)} HT par mois.
+            </span>
+          </p>
+          <CtaPrincipal className="shrink-0" />
         </div>
       </Shell>
     </section>
@@ -805,7 +678,7 @@ function Conditions() {
 }
 
 /* ========================================================================== */
-/* Annexe · Questions                                                         */
+/* Questions                                                                  */
 /* ========================================================================== */
 
 const QUESTIONS = [
@@ -817,25 +690,29 @@ const QUESTIONS = [
   { q: "Y a-t-il de l'intelligence artificielle ?", r: "Non, et c'est volontaire. Le diagnostic est saisi par le technicien. Aucun constat, aucun prix n'est généré automatiquement." },
 ];
 
-function Annexe() {
+function Questions() {
   return (
-    <section className="py-20 sm:py-28">
+    <section className="py-20 sm:py-32">
       <Shell>
-        <div className="rule-heavy pt-5">
-          <p className="field-tag">
-            <span className="mark">Annexe</span>
-          </p>
-          <h2 className="display display-l mt-3">Questions posées en atelier</h2>
-        </div>
-
-        <div className="mt-14 md:columns-2 md:gap-14">
-          {QUESTIONS.map((item, i) => (
-            <article key={item.q} className="mb-9 break-inside-avoid">
-              <p className="tech text-xs text-[var(--ink-soft)]">Q.{String(i + 1).padStart(2, "0")}</p>
-              <h3 className="mt-1.5 text-lg font-bold leading-snug">{item.q}</h3>
-              <p className="mt-2 leading-relaxed text-[var(--ink-soft)]">{item.r}</p>
-            </article>
-          ))}
+        <div className="grid grid-cols-1 gap-12 md:grid-cols-12 md:gap-8">
+          <div className="md:col-span-4">
+            <div className="md:sticky md:top-24">
+              <Kicker n="06">Questions</Kicker>
+              <h2 className="display-shout mt-6 text-[clamp(2.1rem,1rem+3vw,3.75rem)]">Posées en atelier.</h2>
+            </div>
+          </div>
+          <div className="faq border-t-2 border-[var(--ink)] md:col-span-8">
+            {QUESTIONS.map((item, i) => (
+              <details key={item.q} className="rule-b group" open={i === 0}>
+                <summary className="flex items-center gap-5 py-6">
+                  <span className="tech w-8 shrink-0 text-sm text-[var(--ink-soft)]">{String(i + 1).padStart(2, "0")}</span>
+                  <h3 className="display flex-1 text-xl sm:text-2xl">{item.q}</h3>
+                  <span className="faq__sign" aria-hidden />
+                </summary>
+                <p className="max-w-[60ch] pb-7 pl-[3.25rem] leading-relaxed text-[var(--ink-soft)]">{item.r}</p>
+              </details>
+            ))}
+          </div>
         </div>
       </Shell>
     </section>
@@ -848,35 +725,23 @@ function Annexe() {
 
 function Cloture() {
   return (
-    <section className="pb-16 pt-12 sm:pb-20 sm:pt-16">
-      <Shell>
-        <div className="rule-heavy grid gap-10 pt-5 md:grid-cols-12 md:gap-10">
-          <div className="md:col-span-7">
-            <p className="field-tag">
-              <span className="mark">Bon pour accord</span>
-            </p>
-            <p className="display display-l mt-4 max-w-[20ch]">Le prochain véhicule qui entre, suivez-le jusqu&apos;au bout.</p>
-            <p className="measure mt-5 leading-relaxed text-[var(--ink-soft)]">
-              Créez votre garage, ajoutez votre équipe, réceptionnez un véhicule aujourd&apos;hui. {TRIAL_DAYS} jours, sans carte bancaire.
-            </p>
-            <p className="mt-9">
-              <Link href="/register" className="action action--mark">
-                {PRIMARY_CTA}
-              </Link>
-            </p>
-          </div>
-
-          <div className="self-end md:col-span-4 md:col-start-9">
-            <div className="grid grid-cols-2 gap-6">
-              <div className="rule-b pb-1">
-                <span className="field-tag">Date</span>
-              </div>
-              <div className="rule-b pb-1">
-                <span className="field-tag">Signature</span>
-              </div>
-            </div>
-            <p className="tech mt-4 text-xs text-[var(--ink-soft)]">Déjà client ? <Link href="/login" className="underline">Connexion</Link></p>
-          </div>
+    <section className="public-night overflow-hidden">
+      <div className="hazard h-2.5" aria-hidden />
+      <Shell className="py-24 sm:py-36">
+        <p className="field-tag">
+          <span className="mark font-semibold">Bon pour accord</span>
+        </p>
+        <p className="display-hero mt-8 max-w-[14ch]">
+          Le prochain véhicule, <span className="mark">suivez-le jusqu&apos;au bout.</span>
+        </p>
+        <div className="mt-14 flex flex-col items-start gap-8 md:flex-row md:items-center md:gap-12">
+          <CtaPrincipal />
+          <p className="max-w-[40ch] leading-relaxed text-[var(--ink-soft)]">
+            Créez votre garage, ajoutez votre équipe, réceptionnez un véhicule aujourd&apos;hui. Déjà client ?{" "}
+            <Link href="/login" className="text-[var(--ink)] underline underline-offset-4 hover:text-[var(--mark)]">
+              Connexion
+            </Link>
+          </p>
         </div>
       </Shell>
     </section>

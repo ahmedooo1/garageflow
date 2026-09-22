@@ -367,7 +367,8 @@ button {
 }
 
 .public a:focus-visible,
-.public button:focus-visible {
+.public button:focus-visible,
+.public summary:focus-visible {
   outline: 2px solid var(--mark);
   outline-offset: 3px;
 }
@@ -674,4 +675,247 @@ button {
   .scroll-note {
     display: block;
   }
+}
+
+/* ========================================================================== */
+/* Site public - mise en scène « atelier de nuit »                            */
+/* Alternance acier / papier / orange sécurité. Aucun dégradé décoratif :     */
+/* le seul motif est le marquage au sol, repris des zones de sécurité.        */
+/* ========================================================================== */
+
+/* Nuit d'atelier, un cran plus profond que .public-dark pour le hero. */
+.public-night {
+  --paper: #0e1216;
+  --paper-2: #171c22;
+  --ink: #f4f3f0;
+  --ink-soft: #9ba6b2;
+  --rule: #262e37;
+  --rule-strong: #3d4752;
+  --mark: #ff6418;
+
+  background: var(--paper);
+  color: var(--ink);
+}
+
+/* Bloc orange plein : une seule rupture de ce type par page. */
+/* Orange éclairci par rapport à --mark : l'encre noire y garde un contraste
+   AA (5,8:1 pour le texte, 5,2:1 pour le texte secondaire). */
+.public-signal {
+  --paper: #e8661e;
+  --paper-2: #d85c16;
+  --ink: #120f0d;
+  --ink-soft: #2a160b;
+  --rule: rgba(18, 15, 13, 0.28);
+  --rule-strong: rgba(18, 15, 13, 0.55);
+  --mark: #120f0d;
+
+  background: var(--paper);
+  color: var(--ink);
+}
+
+/* Dans la couche components : un utilitaire text-[…] posé sur l'élément
+   doit pouvoir ajuster la taille sans !important. */
+@layer components {
+  /* Titraille de choc : chasse maximale, graisse lourde, capitales. */
+  .display-hero {
+    font-weight: 800;
+    font-stretch: 125%;
+    letter-spacing: -0.035em;
+    line-height: 0.88;
+    text-transform: uppercase;
+    font-size: clamp(2.6rem, 0.6rem + 6.6vw, 7.4rem);
+    text-wrap: balance;
+  }
+  .display-shout {
+    font-weight: 800;
+    font-stretch: 125%;
+    letter-spacing: -0.03em;
+    line-height: 0.92;
+    text-transform: uppercase;
+    font-size: clamp(2.1rem, 0.9rem + 4.6vw, 5.4rem);
+    text-wrap: balance;
+  }
+
+  /* Chiffre géant, en contour : se lit comme un marquage peint. */
+  .figure-xxl {
+    font-weight: 800;
+    font-stretch: 125%;
+    letter-spacing: -0.05em;
+    line-height: 0.8;
+    font-size: clamp(5rem, 2rem + 11vw, 12.5rem);
+    font-variant-numeric: tabular-nums;
+  }
+  .figure-outline {
+    color: transparent;
+    -webkit-text-stroke: 2px var(--ink);
+  }
+  @supports not (-webkit-text-stroke: 2px black) {
+    .figure-outline {
+      color: var(--ink);
+    }
+  }
+}
+
+/* Marquage au sol, zone de sécurité. Hauteur fixée par l'utilitaire. */
+.hazard {
+  background-image: repeating-linear-gradient(-45deg, #d2510c 0 18px, #0e1216 18px 36px);
+}
+
+/* Bouton principal, format XL : bloc plein, flèche qui avance au survol. */
+.action--xl {
+  min-height: 4rem;
+  padding: 0 1.9rem;
+  font-size: 1.0625rem;
+  font-weight: 700;
+}
+/* Sur une seule ligne dès qu'il y a la place ; en dessous, le libellé passe à la ligne. */
+@media (min-width: 400px) {
+  .action--xl {
+    white-space: nowrap;
+  }
+}
+.action__arrow {
+  display: inline-block;
+  transition: transform 160ms ease-out;
+}
+.action:hover .action__arrow,
+.action:focus-visible /* Sur une seule ligne dès qu'il y a la place ; en dessous, le libellé passe à la ligne. */
+@media (min-width: 400px) {
+  .action--xl {
+    white-space: nowrap;
+  }
+}
+.action__arrow {
+  transform: translateX(0.3rem);
+}
+/* Sur fond nuit, l'orange vif porte une encre noire : le blanc n'y atteint
+   que 3:1, insuffisant pour un libellé de bouton de taille courante. */
+.public-night .action--mark {
+  color: #0e1216;
+}
+.public-night .action--mark:hover,
+.public-dark .action--mark:hover {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #0e1216;
+}
+.public-signal .action {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
+}
+.public-signal .action:hover {
+  background: #fff;
+  border-color: #fff;
+  color: var(--ink);
+}
+
+/* Capture mise en scène : bloc orange décalé derrière, à la place d'une ombre. */
+.stage-shot {
+  position: relative;
+  isolation: isolate;
+}
+.stage-shot::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translate(-14px, 14px);
+  background: #d2510c;
+  z-index: -1;
+}
+.stage-shot--flip::before {
+  transform: translate(14px, 14px);
+}
+.stage-shot > .stage-shot__frame {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: #1a2029;
+  overflow: hidden;
+}
+
+/* Téléphone : cadre sobre, épaisseur d'un vrai appareil. */
+.phone {
+  border: 9px solid #0b0e11;
+  border-radius: 1.9rem;
+  background: #0b0e11;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+.phone > div {
+  overflow: hidden;
+  border-radius: 1.35rem;
+}
+
+/* Bandeau des statuts, défilement continu façon tableau des départs. */
+.ticker {
+  overflow: hidden;
+  white-space: nowrap;
+}
+.ticker__track {
+  display: inline-flex;
+  animation: ticker 55s linear infinite;
+}
+.ticker:hover .ticker__track {
+  animation-play-state: paused;
+}
+@keyframes ticker {
+  to {
+    transform: translateX(-50%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ticker__track {
+    animation: none;
+  }
+  /* Sur une seule ligne dès qu'il y a la place ; en dessous, le libellé passe à la ligne. */
+@media (min-width: 400px) {
+  .action--xl {
+    white-space: nowrap;
+  }
+}
+.action__arrow {
+    transition: none;
+  }
+}
+
+/* Phrase barrée au marqueur : ce que l'atelier n'entendra plus. */
+.strike {
+  background-image: linear-gradient(#d2510c, #d2510c);
+  background-repeat: no-repeat;
+  background-size: 100% 0.14em;
+  background-position: 0 55%;
+}
+
+/* Accordéon de la FAQ : marqueur natif remplacé par un signe plus/moins. */
+.faq summary {
+  list-style: none;
+  cursor: pointer;
+}
+.faq summary::-webkit-details-marker {
+  display: none;
+}
+.faq__sign {
+  position: relative;
+  width: 1.1rem;
+  height: 1.1rem;
+  flex: 0 0 auto;
+}
+.faq__sign::before,
+.faq__sign::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 2px;
+  margin-top: -1px;
+  background: currentColor;
+  transition: transform 160ms ease-out;
+}
+.faq__sign::after {
+  transform: rotate(90deg);
+}
+.faq details[open] .faq__sign::after {
+  transform: rotate(0deg);
+}
+.faq details[open] summary {
+  color: var(--mark);
 }

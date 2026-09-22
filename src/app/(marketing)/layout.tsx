@@ -5,11 +5,11 @@ import { publicFontVars } from "@/lib/fonts";
 export const PRIMARY_CTA = "Essayer 14 jours gratuitement";
 
 const SECTIONS = [
-  { href: "/#dossier", label: "Dossier" },
+  { href: "/#atelier", label: "Atelier" },
   { href: "/#parcours", label: "Parcours" },
   { href: "/#controle", label: "Contrôle" },
   { href: "/#validation", label: "Validation" },
-  { href: "/#conditions", label: "Conditions" },
+  { href: "/#tarifs", label: "Tarifs" },
 ];
 
 /** Marque typographique : lisible seule, sans pictogramme. */
@@ -25,7 +25,7 @@ export function Wordmark({ className = "" }: { className?: string }) {
 export default function MarketingLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className={`public flex min-h-dvh flex-col ${publicFontVars}`}>
-      <header className="rule-b sticky top-0 z-50 bg-[var(--paper)]">
+      <header className="public-night rule-b sticky top-0 z-50">
         <div className="mx-auto flex h-16 max-w-[84rem] items-center gap-4 px-5 sm:px-8">
           <Link href="/" aria-label="GarageFlow, accueil">
             <Wordmark />
@@ -43,11 +43,10 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
             <Link href="/login" className="field-tag field-tag--xs hidden transition-colors hover:text-[var(--ink)] sm:inline">
               Connexion
             </Link>
-            <Link href="/register" className="link-arrow text-xs sm:text-sm">
-              {PRIMARY_CTA}
-              <span aria-hidden className="hidden sm:inline">
-                →
-              </span>
+            {/* Toujours visible, y compris sur téléphone : c'est la seule action de la page. */}
+            <Link href="/register" className="action action--mark min-h-10 px-3.5 text-[0.8125rem] sm:px-4 sm:text-sm">
+              <span className="sm:hidden">Essai gratuit</span>
+              <span className="hidden sm:inline">{PRIMARY_CTA}</span>
             </Link>
           </div>
         </div>
@@ -55,7 +54,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
 
       <main className="flex-1">{children}</main>
 
-      <footer className="rule-heavy mt-24">
+      <footer className="public-night">
         <div className="mx-auto max-w-[84rem] px-5 py-14 sm:px-8">
           <div className="grid gap-12 md:grid-cols-[1.4fr_2fr]">
             <div>
