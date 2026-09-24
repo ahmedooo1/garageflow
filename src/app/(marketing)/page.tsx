@@ -47,17 +47,6 @@ function Shell({ children, className = "" }: { children: React.ReactNode; classN
   return <div className={`mx-auto max-w-[84rem] px-5 sm:px-8 ${className}`}>{children}</div>;
 }
 
-/** Repère de section : numéro orange, intitulé en capitales mono. */
-function Kicker({ n, children }: { n: string; children: React.ReactNode }) {
-  return (
-    <p className="field-tag flex items-center gap-3">
-      <span className="mark font-semibold">{n}</span>
-      <span className="h-px w-8 bg-[var(--rule-strong)]" aria-hidden />
-      <span>{children}</span>
-    </p>
-  );
-}
-
 function CtaPrincipal({ className = "" }: { className?: string }) {
   return (
     <Link href="/register" className={`action action--mark action--xl ${className}`}>
@@ -146,10 +135,6 @@ function Vague({ couleur, accent = "#d2510c", position = "haut" }: { couleur: st
   );
 }
 
-function Legende({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <p className={`field-tag field-tag--xs ${className}`}>{children}</p>;
-}
-
 /* ========================================================================== */
 /* Ouverture                                                                  */
 /* ========================================================================== */
@@ -160,13 +145,7 @@ function Ouverture() {
   return (
     <section className="public-night relative overflow-hidden">
       <Shell className="pt-12 sm:pt-20">
-        <p className="field-tag flex flex-wrap items-center gap-x-5 gap-y-2">
-          <span className="mark font-semibold">Logiciel d&apos;atelier</span>
-          <span>Garages indépendants</span>
-          <span className="hidden sm:inline">Édité en France</span>
-        </p>
-
-        <h1 className="display-hero mt-7 sm:mt-9">
+        <h1 className="display-hero">
           L&apos;atelier <br className="hidden sm:block" />
           <span className="mark">sous contrôle.</span>
         </h1>
@@ -269,8 +248,7 @@ function Promesse() {
     <section className="rule-t py-20 sm:py-28">
       <Shell>
         <div className="grid grid-cols-1 gap-10 md:grid-cols-12 md:gap-8">
-          <p className="field-tag md:col-span-3 md:pt-4">Au comptoir, avant</p>
-          <div className="md:col-span-9">
+          <div className="md:col-span-9 md:col-start-4">
             <p className="display-shout">
               « <span className="strike">Je n&apos;avais pas dit oui pour ça.</span> »
             </p>
@@ -308,8 +286,7 @@ function Atelier() {
       <Shell>
         <div className="grid grid-cols-1 gap-8 md:grid-cols-12">
           <div className="md:col-span-7">
-            <Kicker n="01">Le tableau d&apos;atelier</Kicker>
-            <h2 className="display-shout mt-6">Toute la journée sur un seul écran.</h2>
+            <h2 className="display-shout">Toute la journée sur un seul écran.</h2>
           </div>
           <p className="self-end text-lg leading-relaxed text-[var(--ink-soft)] md:col-span-4 md:col-start-9">
             Il tient sur la tablette accrochée au mur et se lit depuis le pont. Chacun sait quelle voiture attend quoi, sans passer par le bureau.
@@ -325,8 +302,6 @@ function Atelier() {
           sizes="(min-width: 768px) 84rem, 60rem"
           alt="Tableau d'atelier de GarageFlow : quatre compteurs en tête (6 véhicules en cours, 2 en retard, 1 en attente client, 1 prêt à restituer), un filtre par technicien, puis les couloirs À diagnostiquer, Diagnostic, Attente client, Attente pièces et À réparer."
         />
-
-        <Legende className="mt-8">Tableau d&apos;atelier · copie d&apos;écran de l&apos;application, jeu de démonstration</Legende>
 
         <ol className="mt-16 grid grid-cols-1 gap-x-10 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
           {NOTES.map((note) => (
@@ -363,8 +338,7 @@ function Parcours() {
       <Shell>
         <div className="grid grid-cols-1 gap-8 md:grid-cols-12">
           <div className="md:col-span-12">
-            <Kicker n="02">Le parcours</Kicker>
-            <h2 className="display-shout mt-6">
+            <h2 className="display-shout">
               08:05, la voiture entre. <br className="hidden lg:block" />
               <span className="mark">17:25, la clé est rendue.</span>
             </h2>
@@ -410,7 +384,6 @@ function Parcours() {
                 alt="Liste des dossiers d'intervention dans GarageFlow. Six lignes, chacune avec son numéro de dossier, sa plaque, son véhicule, son client, son technicien, la date promise et son statut : Véhicule prêt, Contrôle final, Réceptionné, Attente pièces, Attente client, En réparation."
               />
             </div>
-            <Legende className="mt-5">Liste des dossiers · copie d&apos;écran de l&apos;application, jeu de démonstration</Legende>
           </div>
         </div>
       </Shell>
@@ -448,8 +421,7 @@ function Controle() {
       <Shell>
         <div className="grid grid-cols-1 gap-16 lg:grid-cols-12 lg:gap-10">
           <div className="lg:col-span-5">
-            <Kicker n="03">Le contrôle</Kicker>
-            <h2 className="display-shout mt-6">
+            <h2 className="display-shout">
               {CHECKLIST_ITEMS.length} points. <span className="mark">Aucun oubli.</span>
             </h2>
             <p className="mt-6 text-lg leading-relaxed text-[var(--ink-soft)]">
@@ -480,7 +452,6 @@ function Controle() {
                   alt="Feuille de contrôle véhicule dans GarageFlow. Pour chaque point, cinq états au choix : OK, À surveiller, Recommandé, Urgent, Non contrôlé. Les plaquettes avant sont marquées Urgent avec la mesure 2 mm, les pneus arrière À surveiller avec 3 mm. Un bouton Photo accompagne chaque point renseigné."
                 />
               </div>
-              <Legende className="mt-6">Dossier et feuille de contrôle · copies d&apos;écran de l&apos;application, jeu de démonstration</Legende>
             </div>
           </div>
         </div>
@@ -540,15 +511,13 @@ function Validation() {
       <Shell className="py-20 sm:py-32">
         <div className="grid grid-cols-1 gap-16 md:grid-cols-12 md:gap-8">
           <div className="md:col-span-7">
-            <Kicker n="04">La validation client</Kicker>
-            <h2 className="display-shout mt-6">Le client dit oui. Par écrit. Ligne par ligne.</h2>
+            <h2 className="display-shout">Le client dit oui. Par écrit. Ligne par ligne.</h2>
             <p className="mt-8 max-w-[46ch] text-xl leading-[1.5]">
               Il reçoit un lien sur son téléphone. Il voit le diagnostic, les photos, le détail des prix, et coche ce qu&apos;il autorise.
             </p>
 
             <blockquote className="mt-10 border-l-2 border-[var(--ink)] pl-5">
               <p className="display display-m">« Les essuie-glaces, je les ferai moi-même. »</p>
-              <footer className="field-tag mt-3">Commentaire joint à la réponse, conservé dans le dossier</footer>
             </blockquote>
 
             {/* La pièce archivée : ce que l'atelier garde en cas de litige. */}
@@ -616,8 +585,7 @@ function Tarifs() {
       <Shell>
         <div className="grid grid-cols-1 gap-8 md:grid-cols-12">
           <div className="md:col-span-7">
-            <Kicker n="05">Les tarifs</Kicker>
-            <h2 className="display-shout mt-6">Un prix par garage. Pas par dossier.</h2>
+            <h2 className="display-shout">Un prix par garage. Pas par dossier.</h2>
           </div>
           <p className="self-end text-lg leading-relaxed text-[var(--ink-soft)] md:col-span-4 md:col-start-9">
             Dossiers, photos et diagnostics illimités dans les deux formules. Seul le nombre de comptes change. Sans engagement.
@@ -683,8 +651,7 @@ function Questions() {
         <div className="grid grid-cols-1 gap-12 md:grid-cols-12 md:gap-8">
           <div className="md:col-span-4">
             <div className="md:sticky md:top-24">
-              <Kicker n="06">Questions</Kicker>
-              <h2 className="display-shout mt-6 text-[clamp(2.1rem,1rem+3vw,3.75rem)]">Posées en atelier.</h2>
+              <h2 className="display-shout text-[clamp(2.1rem,1rem+3vw,3.75rem)]">Posées en atelier.</h2>
             </div>
           </div>
           <div className="faq border-t-2 border-[var(--ink)] md:col-span-8">
@@ -714,10 +681,7 @@ function Cloture() {
     <section className="public-night overflow-hidden">
       <Vague couleur="#f4f3f0" />
       <Shell className="py-24 sm:py-36">
-        <p className="field-tag">
-          <span className="mark font-semibold">Bon pour accord</span>
-        </p>
-        <p className="display-hero mt-8 max-w-[14ch]">
+        <p className="display-hero max-w-[14ch]">
           Le prochain véhicule, <span className="mark">suivez-le jusqu&apos;au bout.</span>
         </p>
         <div className="mt-14 flex flex-col items-start gap-8 md:flex-row md:items-center md:gap-12">
