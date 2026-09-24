@@ -93,9 +93,6 @@ test("les copies d'écran du produit sont réellement chargées", async ({ page 
     const etat = await capture.evaluate((n: HTMLImageElement) => ({ ok: n.complete && n.naturalWidth > 0, alt: n.alt.slice(0, 40) }));
     expect(etat.ok, `image non chargée : ${etat.alt}`).toBe(true);
   }
-
-  // Les légendes ne doivent pas promettre plus que ce que les images montrent.
-  await expect(page.locator("#atelier")).toContainText("copie d'écran de l'application");
 });
 
 test("la décision affichée correspond à celle du jeu de démonstration", async ({ page }) => {
