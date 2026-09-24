@@ -237,7 +237,7 @@ function Chiffres() {
     { n: "08", t: "étapes", d: "De la réception à la clé rendue, dans l'ordre réel du travail." },
     { n: String(CHECKLIST_ITEMS.length), t: "points de contrôle", d: "Toujours les mêmes, pour chaque véhicule, sur tablette." },
     { n: String(STATUS_ORDER.length), t: "statuts vérifiés", d: "Le serveur refuse les sauts d'étape. Pas de réparation sans accord." },
-    { n: "0", t: "intelligence artificielle", d: "Chaque constat et chaque prix est saisi par votre équipe." },
+    { n: "1", t: "lien pour le client", d: "Il valide le devis depuis son téléphone, sans compte ni application." },
   ];
 
   return (
@@ -674,7 +674,6 @@ const QUESTIONS = [
   { q: "Combien de temps pour démarrer ?", r: "Le temps de créer votre garage et d'ajouter votre équipe, soit une quinzaine de minutes. Le premier véhicule peut être réceptionné dans la foulée." },
   { q: "Que deviennent mes données si j'arrête ?", r: "Elles restent consultables et vous pouvez les exporter au format JSON depuis les paramètres, à tout moment, y compris après la fin de l'essai." },
   { q: "Les photos sont-elles protégées ?", r: "Elles ne sont jamais accessibles par une adresse devinable : chaque affichage passe par un lien signé qui expire au bout de quinze minutes." },
-  { q: "Y a-t-il de l'intelligence artificielle ?", r: "Non, et c'est volontaire. Le diagnostic est saisi par le technicien. Aucun constat, aucun prix n'est généré automatiquement." },
 ];
 
 function Questions() {
