@@ -127,6 +127,25 @@ function Telephone({ className = "", sizes = "20rem" }: { className?: string; si
   );
 }
 
+/* Bord ondulé et incliné entre deux sections : la vague prend la couleur de
+   la section voisine, un filet d'accent suit sa crête. « haut » se place en
+   tête de section, « bas » en pied (vague retournée). */
+const VAGUE = "C1320,62 1200,-2 1080,34 C960,76 840,12 720,52 C600,94 480,30 360,70 C240,110 120,52 0,94";
+
+function Vague({ couleur, accent = "#d2510c", position = "haut" }: { couleur: string; accent?: string; position?: "haut" | "bas" }) {
+  return (
+    <svg
+      className={`block h-14 w-full sm:h-24 lg:h-28 ${position === "bas" ? "-scale-100" : ""}`}
+      viewBox="0 0 1440 120"
+      preserveAspectRatio="none"
+      aria-hidden
+    >
+      <path d={`M1440,20 ${VAGUE}`} fill="none" stroke={accent} strokeWidth={5} vectorEffect="non-scaling-stroke" transform="translate(0 14)" />
+      <path d={`M0,0 H1440 V20 ${VAGUE} Z`} fill={couleur} />
+    </svg>
+  );
+}
+
 function Legende({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return <p className={`field-tag field-tag--xs ${className}`}>{children}</p>;
 }
@@ -136,18 +155,6 @@ function Legende({ children, className = "" }: { children: React.ReactNode; clas
 /* ========================================================================== */
 
 const STATUS_ORDER = Object.keys(STATUS_LABELS) as (keyof typeof STATUS_LABELS)[];
-
-/* Journée type du jeu de démonstration : une plaque, une heure, un statut. */
-const DEPARTS = [
-  ["08:05", "GH-123-KL", "Réceptionné"],
-  ["08:20", "EZ-789-DE", "Diagnostic"],
-  ["09:10", "GH-123-KL", "Contrôle en cours"],
-  ["10:50", "EZ-789-DE", "Attente client"],
-  ["11:30", "DK-321-FG", "Attente pièces"],
-  ["13:15", "GH-123-KL", "En réparation"],
-  ["16:40", "GT-654-HJ", "Contrôle final"],
-  ["17:25", "GH-123-KL", "Véhicule restitué"],
-] as const;
 
 function Ouverture() {
   return (
@@ -216,27 +223,7 @@ function Ouverture() {
         </div>
       </Shell>
 
-      {/* Tableau des départs : la journée qui défile. Décoratif, doublé en
-          clair par la section Parcours. */}
-      <div className="hazard h-2.5" aria-hidden />
-      <div className="ticker rule-b bg-[var(--paper-2)] py-3.5" aria-hidden>
-        <div className="ticker__track">
-          {[0, 1].map((k) => (
-            <div key={k} className="flex shrink-0">
-              {DEPARTS.map(([h, plaque, statut]) => (
-                <span key={`${k}-${h}`} className="tech flex items-center gap-3 pr-12 text-sm">
-                  <span className="text-[var(--ink-soft)]">{h}</span>
-                  <span className="border border-[var(--rule-strong)] px-1.5 font-semibold tracking-[0.08em]">{plaque}</span>
-                  <span className="uppercase tracking-[0.08em]">{statut}</span>
-                  <span className="mark" aria-hidden>
-                    ■
-                  </span>
-                </span>
-              ))}
-            </div>
-          ))}
-        </div>
-      </div>
+      <Vague couleur="#f4f3f0" position="bas" />
     </section>
   );
 }
@@ -549,7 +536,7 @@ const LIGNES = [
 function Validation() {
   return (
     <section id="validation" className="public-signal scroll-mt-16 overflow-hidden">
-      <div className="hazard h-2.5" aria-hidden />
+      <Vague couleur="#161c24" accent="#0e1216" />
       <Shell className="py-20 sm:py-32">
         <div className="grid grid-cols-1 gap-16 md:grid-cols-12 md:gap-8">
           <div className="md:col-span-7">
@@ -661,7 +648,7 @@ function Tarifs() {
           ))}
         </div>
 
-        <div className="hazard mt-4 h-1.5" aria-hidden />
+        <div className="wave-line mt-4 h-3" aria-hidden />
         <div className="mt-10 flex flex-col items-start justify-between gap-8 md:flex-row md:items-center">
           <p className="max-w-[48ch] text-lg leading-relaxed">
             <span className="font-bold">{TRIAL_DAYS} jours d&apos;essai, sans carte bancaire.</span>{" "}
@@ -726,7 +713,7 @@ function Questions() {
 function Cloture() {
   return (
     <section className="public-night overflow-hidden">
-      <div className="hazard h-2.5" aria-hidden />
+      <Vague couleur="#f4f3f0" />
       <Shell className="py-24 sm:py-36">
         <p className="field-tag">
           <span className="mark font-semibold">Bon pour accord</span>
