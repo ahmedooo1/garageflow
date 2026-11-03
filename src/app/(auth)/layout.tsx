@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Audience } from "@/components/audience";
 import { getSession } from "@/server/auth/session";
 
 /**
@@ -12,6 +13,7 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
 
   return (
     <div className="flex min-h-dvh flex-col bg-[#f4f3f0]">
+      <Audience />
       <header className="border-b border-[#d7d4cc]">
         <div className="mx-auto flex h-16 max-w-3xl items-center justify-between gap-4 px-5">
           <Link href="/" className="inline-flex items-center gap-2" aria-label="GarageFlow, accueil">

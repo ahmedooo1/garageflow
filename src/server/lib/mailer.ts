@@ -7,6 +7,10 @@ export type Mail = {
   text: string;
   /** Version HTML facultative : encapsulée dans la charte GarageFlow. */
   html?: string;
+  /** Expéditeur propre à ce message (prospection), sinon MAIL_FROM. */
+  from?: string;
+  replyTo?: string;
+  headers?: Record<string, string>;
 };
 
 let transporter: Transporter | null = null;
@@ -41,14 +45,16 @@ export async function sendMail(mail: Mail): Promise<void> {
   // "silent" : utilisé par la suite de tests, aucun effet de bord.
   if (transport === "silent") return;
   if (transport === "log") {
-    console.info(`[mail] from=${mailFrom()} to=${mail.to} subject="${mail.subject}"\n${mail.text}`);
+    console.info(`[mail] from=${mail.from ?? mailFrom()} to=${mail.to} subject="${mail.subject}"\n${mail.text}`);
     return;
   }
   if (transport !== "smtp") throw new Error(`Transport email inconnu : ${transport}`);
   try {
     await smtpTransport().sendMail({
-      from: mailFrom(),
+      from: mail.from ?? mailFrom(),
       to: mail.to,
+      replyTo: mail.replyTo,
+      headers: mail.headers,
       subject: mail.subject,
       text: mail.text,
       html: mail.html ? layout(mail.subject, mail.html) : undefined,

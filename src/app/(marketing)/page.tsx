@@ -11,12 +11,19 @@ import apercuStatuts from "./apercu-statuts.png";
 import { CHECKLIST_ITEMS, CHECKLIST_SECTIONS, STATUS_LABELS } from "@/lib/labels";
 import { formatPriceHt, PLANS, TRIAL_DAYS } from "@/lib/plans";
 import { getSession } from "@/server/auth/session";
+import { DemoForm } from "./demo-form";
 import { PRIMARY_CTA } from "./layout";
 
 export const metadata: Metadata = {
   title: "GarageFlow · Logiciel d'atelier pour garages indépendants",
   description:
     "Réception photo, diagnostic du technicien, validation des travaux par le client en un lien, réparation et restitution. GarageFlow suit chaque véhicule de l'entrée à la clé rendue.",
+  alternates: { canonical: "/" },
+  openGraph: {
+    title: "GarageFlow · Logiciel d'atelier pour garages indépendants",
+    description: "Réception, diagnostic, validation des travaux par le client en un lien, restitution.",
+    url: "/",
+  },
 };
 
 export default async function LandingPage() {
@@ -33,6 +40,7 @@ export default async function LandingPage() {
       <Controle />
       <Validation />
       <Tarifs />
+      <Demonstration />
       <Questions />
       <Cloture />
     </>
@@ -626,6 +634,37 @@ function Tarifs() {
             </span>
           </p>
           <CtaPrincipal className="shrink-0" />
+        </div>
+      </Shell>
+    </section>
+  );
+}
+
+/* ========================================================================== */
+/* Démonstration                                                              */
+/* ========================================================================== */
+
+function Demonstration() {
+  return (
+    <section id="demo" className="rule-b scroll-mt-16 py-20 sm:py-32">
+      <Shell>
+        <div className="grid grid-cols-1 gap-12 md:grid-cols-12 md:gap-8">
+          <div className="md:col-span-5">
+            <h2 className="display-shout text-[clamp(2.1rem,1rem+3vw,3.75rem)]">Vingt minutes sur un vrai dossier.</h2>
+            <p className="mt-6 max-w-[42ch] text-lg leading-relaxed text-[var(--ink-soft)]">
+              En visio ou à l&apos;atelier. Une réception avec photos, un diagnostic, l&apos;envoi du lien au client, son accord ligne par ligne, puis la
+              restitution. Vous posez vos questions sur votre façon de travailler.
+            </p>
+            <p className="mt-6 max-w-[42ch] leading-relaxed text-[var(--ink-soft)]">
+              Vous préférez essayer seul ?{" "}
+              <Link href="/register" className="text-[var(--ink)] underline underline-offset-4 hover:text-[var(--mark)]">
+                {PRIMARY_CTA}
+              </Link>
+            </p>
+          </div>
+          <div className="md:col-span-6 md:col-start-7">
+            <DemoForm />
+          </div>
         </div>
       </Shell>
     </section>

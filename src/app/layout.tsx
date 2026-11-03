@@ -1,13 +1,18 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
+// Les pages statiques sont construites sans APP_URL : on retombe alors sur le domaine de production.
+const APP_URL = (process.env.APP_URL ?? "https://garageflow.aaweb.fr").replace(/\/$/, "");
+
 export const metadata: Metadata = {
+  metadataBase: new URL(APP_URL),
   title: { default: "GarageFlow", template: "%s · GarageFlow" },
   description: "Gestion d'atelier pour garages indépendants : réception, diagnostic, validation client, réparation, restitution.",
   applicationName: "GarageFlow",
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "GarageFlow" },
   icons: { icon: "/icons/icon.svg", apple: "/icons/apple-touch-icon.png" },
+  openGraph: { type: "website", locale: "fr_FR", siteName: "GarageFlow" },
 };
 
 export const viewport: Viewport = {

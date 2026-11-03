@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Audience } from "@/components/audience";
 import { publicFontVars } from "@/lib/fonts";
 
 /** Formulation unique de l’action principale, reprise à l’identique partout. */
@@ -10,6 +11,7 @@ const SECTIONS = [
   { href: "/#controle", label: "Contrôle" },
   { href: "/#validation", label: "Validation" },
   { href: "/#tarifs", label: "Tarifs" },
+  { href: "/#demo", label: "Démo" },
 ];
 
 /** Marque typographique : lisible seule, sans pictogramme. */
@@ -52,6 +54,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
         </div>
       </header>
 
+      <Audience />
       <main className="flex-1">{children}</main>
 
       <footer className="public-night">

@@ -33,13 +33,13 @@ export function LegalPage({ title, updatedAt, children }: { title: string; updat
   );
 }
 
-export function LegalSection({ title, children }: { title: string; children: ReactNode }) {
+export function LegalSection({ title, children, id }: { title: string; children: ReactNode; id?: string }) {
   const numbered = title.match(/^(\d+)\.\s*(.+)$/);
   const n = numbered?.[1];
   const label = numbered?.[2] ?? title;
 
   return (
-    <section className="rule-t grid gap-x-6 gap-y-3 py-7 first:border-t-2 first:border-[var(--ink)] sm:grid-cols-[3rem_1fr]">
+    <section id={id} className="rule-t scroll-mt-20 grid gap-x-6 gap-y-3 py-7 first:border-t-2 first:border-[var(--ink)] sm:grid-cols-[3rem_1fr]">
       <p className="tech pt-1 text-sm text-[var(--ink-soft)]">{n ? String(n).padStart(2, "0") : "-"}</p>
       <div>
         <h2 className="display display-m">{label}</h2>

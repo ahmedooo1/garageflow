@@ -1,5 +1,7 @@
 import { z } from "zod";
+import { sanitizeSource } from "@/lib/growth/normalize";
 import { prisma } from "@/server/db";
+import { linkSignupToLead } from "@/server/growth/leads";
 import { generateToken, sha256 } from "@/server/lib/crypto";
 import { AppError, ConflictError, UnauthorizedError } from "@/server/lib/errors";
 import { getAppUrl } from "@/server/lib/request";
@@ -16,6 +18,8 @@ export const registerSchema = z.object({
   email: emailField,
   password: passwordField,
   phone: z.string().trim().max(30).default(""),
+  /** Provenance de campagne (utm_source / ref du lien suivi), jamais un identifiant de personne. */
+  source: z.string().max(100).default("").transform(sanitizeSource),
 });
 
 export type RegisterInput = z.input<typeof registerSchema>;
@@ -30,7 +34,7 @@ export async function registerGarage(input: RegisterInput, meta: { ip?: string; 
   const trialEndsAt = trialEndDate();
   const result = await prisma.$transaction(async (tx) => {
     const garage = await tx.garage.create({
-      data: { name: data.garageName, phone: data.phone, trialEndsAt, subscriptionStatus: "TRIALING", plan: "ATELIER" },
+      data: { name: data.garageName, phone: data.phone, trialEndsAt, subscriptionStatus: "TRIALING", plan: "ATELIER", acquisitionSource: data.source },
     });
     const user = await tx.user.create({
       data: {
@@ -48,6 +52,8 @@ export async function registerGarage(input: RegisterInput, meta: { ip?: string; 
     );
     return { garage, user };
   });
+  // Suivi commercial : rattache l'inscription au prospect correspondant, sans bloquer l'inscription.
+  await linkSignupToLead(result.garage.id, result.user.email).catch((e) => console.error("[growth] rattachement inscription", e));
   await sendWelcomeEmail({
     to: result.user.email,
     firstName: result.user.firstName,

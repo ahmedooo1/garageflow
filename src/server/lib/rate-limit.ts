@@ -49,4 +49,7 @@ export const RATE_LIMITS = {
   portal: { limit: 60, windowMs: 15 * 60_000 },
   portalDecision: { limit: 10, windowMs: 15 * 60_000 },
   upload: { limit: 120, windowMs: 15 * 60_000 },
+  demoRequest: { limit: 5, windowMs: 60 * 60_000 },
+  audience: { limit: 120, windowMs: 15 * 60_000 },
+  unsubscribe: { limit: 30, windowMs: 15 * 60_000 },
 } as const;

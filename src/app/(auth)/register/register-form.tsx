@@ -4,9 +4,9 @@ import { ActionForm, SubmitButton } from "@/components/forms";
 import { Field } from "@/components/ui";
 import { registerAction } from "@/server/actions/auth";
 
-export function RegisterForm() {
+export function RegisterForm({ source = "" }: { source?: string }) {
   return (
-    <ActionForm action={registerAction} className="space-y-4">
+    <ActionForm action={registerAction} className="space-y-4" hidden={{ source: source || undefined }}>
       {(state) => (
         <>
           <Field label="Nom du garage" name="garageName" error={state.fields?.garageName} required>

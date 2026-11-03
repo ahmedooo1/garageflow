@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 
 export default function PrivacyPage() {
   return (
-    <LegalPage title="Politique de confidentialité" updatedAt="21 septembre 2026">
+    <LegalPage title="Politique de confidentialité" updatedAt="3 novembre 2026">
       <LegalSection title="Qui traite quoi">
         <p>
           Deux rôles coexistent. Pour les comptes des utilisateurs du garage (nom, email, rôle, journaux de connexion), l&apos;éditeur de GarageFlow est
@@ -57,6 +57,40 @@ export default function PrivacyPage() {
         </p>
       </LegalSection>
 
+      <LegalSection title="Prospection commerciale auprès des garages" id="prospection">
+        <p>
+          L&apos;éditeur de GarageFlow contacte des garages de réparation automobile pour leur présenter le service. Il est responsable de ce
+          traitement, fondé sur son intérêt légitime à faire connaître une offre destinée à ces professionnels.
+        </p>
+        <ul className="list-disc space-y-1.5 pl-5">
+          <li>
+            <strong>Données utilisées</strong> : nom et adresse de l&apos;établissement, SIRET, code d&apos;activité, tranche d&apos;effectif et nombre
+            d&apos;établissements (base SIRENE de l&apos;INSEE, données publiques), site web, adresse email et téléphone professionnels publiés par le
+            garage lui-même, ou fournis par lui via le formulaire de démonstration. La source de chaque information est conservée. Les noms des
+            dirigeants ne sont pas collectés.
+          </li>
+          <li>
+            <strong>Usage</strong> : qualifier l&apos;intérêt possible du service pour le garage et lui écrire. Chaque message est relu et envoyé
+            individuellement par une personne ; aucun envoi en masse, aucun appel automatisé.
+          </li>
+          <li>
+            <strong>Durée</strong> : trois ans au plus après le dernier échange. En cas d&apos;opposition, seul l&apos;identifiant nécessaire au respect
+            de cette opposition (email ou SIRET) est conservé.
+          </li>
+          <li>
+            <strong>Opposition</strong> : chaque message comporte un lien de désinscription qui prend effet immédiatement. Vous pouvez aussi répondre
+            « stop » ou écrire à <span className="font-semibold">contact@garageflow.fr</span>.
+          </li>
+        </ul>
+      </LegalSection>
+
+      <LegalSection title="Mesure d'audience" id="audience">
+        <p>
+          Le site public compte les pages vues par jour, par page et par provenance (lien de campagne ou site d&apos;origine). Ce comptage ne dépose
+          aucun cookie, n&apos;enregistre ni adresse IP ni identifiant, et respecte les réglages « Do Not Track » et « Global Privacy Control ».
+        </p>
+      </LegalSection>
+
       <LegalSection title="Sécurité">
         <p>
           Mots de passe hachés (bcrypt), sessions serveur à jeton haché, liens de validation à jeton aléatoire de 256 bits stocké haché et expirant,
@@ -82,7 +116,7 @@ export default function PrivacyPage() {
 
       <LegalSection title="Cookies">
         <p>
-          GarageFlow n&apos;utilise ni cookie publicitaire, ni traceur d&apos;audience tiers. Un unique cookie strictement nécessaire conserve la session
+          GarageFlow n&apos;utilise ni cookie publicitaire, ni traceur d&apos;audience tiers ; la mesure d&apos;audience décrite ci-dessus fonctionne sans cookie. Un unique cookie strictement nécessaire conserve la session
           de l&apos;utilisateur connecté ; il ne requiert pas de consentement préalable et disparaît à la déconnexion.
         </p>
       </LegalSection>

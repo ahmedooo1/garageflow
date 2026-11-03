@@ -4,7 +4,7 @@ Logiciel d'atelier en SaaS pour garages automobiles indépendants : du client à
 
 **Parcours couvert** : Client → Véhicule → Réception → État & photos → Diagnostic → Travaux proposés → Validation client (sans compte) → Réparation → Contrôle final → Véhicule prêt → Restitution → Clôture → Historique.
 
-Aucune intelligence artificielle n'est utilisée : le diagnostic est saisi par le technicien.
+Aucune intelligence artificielle n'est utilisée dans le produit : le diagnostic est saisi par le technicien. Seule la console interne de prospection peut, si on l'active, faire rédiger des brouillons de messages par un modèle, relus avant tout envoi (voir [docs/AI_GROWTH_PLAN.md](docs/AI_GROWTH_PLAN.md)).
 
 ## Stack
 
@@ -52,6 +52,8 @@ Le seed crée 6 clients, 9 véhicules et 8 dossiers répartis sur les statuts, a
 | `/cgu`              | Conditions générales d'utilisation et d'abonnement                   |
 | `/confidentialite`  | Politique de confidentialité (responsabilités, durées, droits)       |
 | `/validation/<jeton>` | Portail client, sans compte                                        |
+| `/#demo`            | Demande de démonstration (arrive dans la console de prospection)     |
+| `/desinscription/<jeton>` | Opposition à la prospection, en un clic                        |
 
 Les textes juridiques sont rédigés pour un éditeur français et doivent être relus par un juriste avant exploitation commerciale : ils ne mentionnent pas encore la raison sociale, l'adresse ni l'hébergeur retenus.
 
@@ -83,6 +85,10 @@ Le nombre de comptes actifs est vérifié à la création d'un utilisateur et à
 `/admin`, réservée aux utilisateurs marqués `platformAdmin`. Elle affiche les garages inscrits, leur abonnement, leur usage agrégé et le revenu mensuel. Actions disponibles : prolonger un essai, activer un plan manuellement, suspendre ou réactiver un compte. Chaque action est journalisée.
 
 Par choix, la console n'expose **aucune donnée métier** des garages : ni clients, ni véhicules, ni dossiers, seulement des compteurs. Un test le vérifie.
+
+### Prospection et croissance
+
+`/admin/prospects` et `/admin/croissance` : découverte de garages dans la base SIRENE (Elbeuf, Rouen, Le Havre), qualification par signaux sourcés, suivi commercial, brouillons de messages approuvés un par un, liste d'opposition, mesure d'audience sans cookie et indicateurs d'activation et de conversion. Les tâches planifiées passent par `POST /api/growth/cron`. Détails, coûts et mise en service : [docs/AI_GROWTH_PLAN.md](docs/AI_GROWTH_PLAN.md).
 
 ### Facturation Stripe
 
@@ -201,7 +207,7 @@ docker compose --profile app up --build # + application (build multi-étapes, mi
 
 - **Stripe n'a jamais été exécuté** faute de clés : à valider en mode test avant toute mise en production.
 - Pas d'envoi de SMS : le lien de validation part par email quand le client en a une, sinon le garage le transmet lui-même.
-- Aucune tâche planifiée : les relances de fin d'essai ne sont pas automatisées, le bandeau dans l'application en tient lieu.
+- Les relances de fin d'essai ne sont pas automatisées, le bandeau dans l'application en tient lieu. Seules les tâches de prospection sont planifiables (`/api/growth/cron`).
 - Le rate limiting est en mémoire, donc limité à une instance.
 - Pas de mode hors ligne : la PWA est installable mais nécessite le réseau.
 - Pas de facturation comptable : GarageFlow s'arrête au montant accepté et à la restitution, sans édition de facture client.

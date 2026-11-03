@@ -25,6 +25,19 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           </div>
         </div>
       </header>
+      <nav className="border-b border-line bg-surface" aria-label="Console">
+        <div className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-4 sm:px-6 lg:px-8">
+          {[
+            { href: "/admin", label: "Garages" },
+            { href: "/admin/prospects", label: "Prospects" },
+            { href: "/admin/croissance", label: "Croissance" },
+          ].map((item) => (
+            <Link key={item.href} href={item.href} className="whitespace-nowrap px-3 py-3 text-sm font-bold text-ink-2 hover:text-ink">
+              {item.label}
+            </Link>
+          ))}
+        </div>
+      </nav>
       <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 lg:px-8">{children}</main>
     </div>
   );
