@@ -11,7 +11,7 @@ import { audit } from "@/server/services/audit";
 import type { CsvLead } from "./csv";
 import type { LeadCandidate } from "./sirene";
 import { addSuppression, isSuppressed } from "./suppression";
-import { checkWebsite, type FetchLike, type Resolver } from "./website";
+import { checkWebsite, type CheckOptions } from "./website";
 
 type Db = Tx | typeof prisma;
 
@@ -259,7 +259,7 @@ export async function rescoreAll(): Promise<{ scored: number; qualified: number 
 }
 
 /** Vérifie le site déclaré, conserve les signaux et, si elles manquent, les coordonnées publiées. */
-export async function enrichLeadWebsite(leadId: string, opts: { actorId?: string; fetchImpl?: FetchLike; resolve?: Resolver } = {}) {
+export async function enrichLeadWebsite(leadId: string, opts: CheckOptions & { actorId?: string } = {}) {
   const lead = await prisma.lead.findUnique({ where: { id: leadId } });
   if (!lead) throw new NotFoundError("Prospect introuvable");
   if (!lead.website) throw new AppError("Aucun site web renseigné pour ce garage");

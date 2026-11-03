@@ -91,14 +91,34 @@ describe("SIRENE", () => {
   });
 
   it("ne garde que les établissements actifs de la zone, ignore les diffusions restreintes et les dirigeants", () => {
-    const { candidates, skipped } = mapSireneResults(sireneFixture, "elbeuf", new Date("2026-11-01"));
+    const { candidates, skipped, reasons } = mapSireneResults(sireneFixture, "elbeuf", new Date("2026-11-01"));
     expect(candidates).toHaveLength(1);
     expect(skipped).toBe(3);
+    expect(reasons).toMatchObject({ horsZone: 1, diffusionRestreinte: 1, ferme: 1 });
     const c = candidates[0];
     expect(c.siret).toBe("11111111100011");
     expect(c.name).toBe("Garage Du Test");
     expect(c.sourceUrl).toBe("https://annuaire-entreprises.data.gouv.fr/etablissement/11111111100011");
     expect(JSON.stringify(c)).not.toMatch(/NE DOIT PAS/);
+  });
+});
+
+describe("SIRENE : format de l'API", () => {
+  it("signale un champ attendu absent (changement de format) au lieu d'importer à l'aveugle", () => {
+    const drift = { results: [{ siren: "444444444", nom_complet: "GARAGE X", etablissements: [] }], total_pages: 1 };
+    const r = mapSireneResults(drift, "elbeuf", new Date());
+    expect(r.candidates).toHaveLength(0);
+    expect(r.missingFields).toContain("results[].matching_etablissements");
+  });
+  it("ignore les valeurs masquées pour non-diffusion", () => {
+    const masked = {
+      results: [{ siren: "555555555", nom_complet: "[NON-DIFFUSIBLE]", statut_diffusion: "O", matching_etablissements: [{ siret: "55555555500011", code_postal: "76500", activite_principale: "45.20A", etat_administratif: "A" }] }],
+      total_pages: 1,
+    };
+    expect(mapSireneResults(masked, "elbeuf", new Date()).reasons.diffusionRestreinte).toBe(1);
+  });
+  it("une réponse sans « results » fait échouer la tâche, visiblement", () => {
+    expect(() => mapSireneResults({ erreur: "format inattendu" }, "elbeuf", new Date())).toThrow();
   });
 });
 

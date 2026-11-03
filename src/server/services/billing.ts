@@ -140,8 +140,18 @@ export async function createPortalSession(ctx: Ctx, appUrl: string): Promise<str
   return session.url;
 }
 
-function mapStatus(status: Stripe.Subscription.Status): SubscriptionStatus {
+/**
+ * Statut GarageFlow correspondant. `null` : ne rien changer. Un abonnement
+ * « incomplete » attend encore un paiement (3-D Secure, prélèvement) : il ne
+ * doit ni activer ni bloquer le garage, qui garde son essai en cours.
+ */
+function mapStatus(status: Stripe.Subscription.Status, current: SubscriptionStatus): SubscriptionStatus | null {
   switch (status) {
+    case "incomplete":
+      return null;
+    case "incomplete_expired":
+      // Paiement jamais abouti : un garage en essai reste en essai (son échéance s'applique).
+      return current === "TRIALING" ? "TRIALING" : "CANCELED";
     case "trialing":
       return "TRIALING";
     case "active":
@@ -159,21 +169,27 @@ async function applySubscription(subscription: Stripe.Subscription): Promise<voi
   const customerId = typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id;
   const garage = await prisma.garage.findFirst({
     where: { OR: [{ stripeCustomerId: customerId }, { id: subscription.metadata?.garageId ?? "__none__" }] },
-    select: { id: true },
+    select: { id: true, subscriptionStatus: true },
   });
   if (!garage) {
     console.warn(`[stripe] abonnement ${subscription.id} sans garage correspondant`);
     return;
   }
+  const status = mapStatus(subscription.status, garage.subscriptionStatus);
+  if (status === null) {
+    await audit({ garageId: garage.id, action: "billing.subscription_pending", entityType: "Garage", entityId: garage.id, metadata: { status: subscription.status, subscriptionId: subscription.id } });
+    return;
+  }
   const item = subscription.items.data[0];
   const plan = planFromPrice(item?.price?.id);
+  if (item?.price?.id && !plan) console.warn(`[stripe] prix ${item.price.id} inconnu : STRIPE_PRICE_ATELIER / STRIPE_PRICE_RESEAU à vérifier`);
   const periodEnd = item?.current_period_end ?? null;
   await prisma.garage.update({
     where: { id: garage.id },
     data: {
       stripeCustomerId: customerId,
       stripeSubscriptionId: subscription.id,
-      subscriptionStatus: mapStatus(subscription.status),
+      subscriptionStatus: status,
       cancelAtPeriodEnd: subscription.cancel_at_period_end,
       currentPeriodEnd: periodEnd ? new Date(periodEnd * 1000) : null,
       ...(plan ? { plan } : {}),

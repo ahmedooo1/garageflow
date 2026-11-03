@@ -145,6 +145,17 @@ export default async function GrowthPage() {
             <Check ok={Boolean(process.env.ANTHROPIC_API_KEY)} label="Rédaction assistée (ANTHROPIC_API_KEY)" />
             <Check ok={process.env.MAIL_TRANSPORT === "smtp"} label="Transport email SMTP" />
           </ul>
+          <dl className="mt-3 space-y-1 text-xs text-muted">
+            <div>
+              APP_URL : <span className="font-mono text-ink-2">{process.env.APP_URL || "(absente)"}</span>
+            </div>
+            <div>
+              MAIL_TRANSPORT : <span className="font-mono text-ink-2">{process.env.MAIL_TRANSPORT || "log (défaut)"}</span>
+            </div>
+            <div>
+              Domaine d&apos;envoi : <span className="font-mono text-ink-2">{(process.env.OUTREACH_FROM || process.env.MAIL_FROM || "").replace(/^.*@/, "").replace(/>.*$/, "") || "(absent)"}</span>
+            </div>
+          </dl>
           {problems.length > 0 && <p className="mt-2 text-xs text-muted">Avant d&apos;approuver : {problems.join(" ; ")}</p>}
           {sendingEnabled() && smtpProblems.length > 0 && <p className="mt-1 text-xs text-muted">Avant d&apos;envoyer depuis GarageFlow : {smtpProblems.join(" ; ")}</p>}
         </Card>

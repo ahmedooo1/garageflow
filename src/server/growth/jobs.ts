@@ -64,7 +64,16 @@ async function discovery(ctx: JobContext): Promise<Stats> {
     const found = await discoverZone(zone, { maxPages, fetchImpl: ctx.fetchImpl });
     const counts = { found: found.candidates.length, skipped: found.skipped, created: 0, updated: 0, unchanged: 0, suppressed: 0 };
     for (const c of found.candidates) counts[await upsertSireneCandidate(c, { dryRun: ctx.dryRun })]++;
-    perZone[zone] = counts;
+    perZone[zone] = {
+      ...counts,
+      pages: found.pages,
+      totalResults: found.totalResults,
+      skipReasons: found.reasons,
+      // Un champ attendu qui manque = l'API a changé de format : à vérifier avant d'exécuter pour de vrai.
+      missingFields: found.missingFields,
+      // En simulation, un échantillon permet de vérifier la lecture à la main (données publiques SIRENE).
+      sample: ctx.dryRun ? found.candidates.slice(0, 3).map((c) => ({ name: c.name, siret: c.siret, postalCode: c.postalCode, workforceRange: c.workforceRange, sourceUrl: c.sourceUrl })) : [],
+    };
     stats.requests = (stats.requests as number) + found.requests.length;
   }
   stats.zones = perZone;

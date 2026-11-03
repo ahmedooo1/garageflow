@@ -104,53 +104,83 @@ function titleCase(value: string): string {
   return value.toLowerCase().replace(/(^|[\s'-])\p{L}/gu, (m) => m.toUpperCase());
 }
 
+export type SkipReasons = {
+  diffusionRestreinte: number;
+  ferme: number;
+  horsActivite: number;
+  horsZone: number;
+  siretInvalide: number;
+  sansNom: number;
+};
+
+const emptyReasons = (): SkipReasons => ({ diffusionRestreinte: 0, ferme: 0, horsActivite: 0, horsZone: 0, siretInvalide: 0, sansNom: 0 });
+
+/** Champs dont dépend le connecteur : leur absence signale un changement de format de l'API. */
+const EXPECTED_UNITE = ["siren", "nom_complet", "matching_etablissements", "nombre_etablissements_ouverts", "tranche_effectif_salarie", "date_creation"] as const;
+const EXPECTED_ETAB = ["siret", "code_postal", "activite_principale", "etat_administratif", "adresse", "libelle_commune"] as const;
+
+/** Valeurs masquées par l'INSEE pour les personnes ayant demandé la non-diffusion. */
+const NON_DIFFUSIBLE = /non[- ]diffusible/i;
+
 /**
  * Transforme une page de résultats en candidats : un par établissement actif,
- * situé dans la zone et exerçant l'activité ciblée.
+ * situé dans la zone et exerçant l'activité ciblée. Chaque exclusion est
+ * comptée par motif, et les champs attendus mais absents sont signalés.
  */
-export function mapSireneResults(raw: unknown, zone: ZoneKey, fetchedAt: Date): { candidates: LeadCandidate[]; skipped: number; totalPages: number } {
+export function mapSireneResults(
+  raw: unknown,
+  zone: ZoneKey,
+  fetchedAt: Date,
+): { candidates: LeadCandidate[]; skipped: number; reasons: SkipReasons; missingFields: string[]; totalPages: number; totalResults: number | null } {
   const data = responseSchema.parse(raw);
   const postalCodes = ZONES[zone].postalCodes;
   const candidates: LeadCandidate[] = [];
-  let skipped = 0;
+  const reasons = emptyReasons();
+  const missing = new Set<string>();
 
   for (const unite of data.results) {
-    if (unite.statut_diffusion && unite.statut_diffusion !== "O") {
-      skipped++;
+    for (const k of EXPECTED_UNITE) if (!(k in unite)) missing.add(`results[].${k}`);
+    if ((unite.statut_diffusion && unite.statut_diffusion !== "O") || NON_DIFFUSIBLE.test(unite.nom_complet ?? "")) {
+      reasons.diffusionRestreinte++;
       continue;
     }
     for (const etab of unite.matching_etablissements ?? []) {
+      for (const k of EXPECTED_ETAB) if (!(k in etab)) missing.add(`matching_etablissements[].${k}`);
       const siret = normalizeSiret(etab.siret);
       const postalCode = normalizePostalCode(etab.code_postal ?? "");
       const naf = etab.activite_principale ?? "";
-      if (!siret || etab.etat_administratif !== "A" || naf !== TARGET_NAF || !postalCodes.includes(postalCode)) {
-        skipped++;
-        continue;
+      if (!siret) reasons.siretInvalide++;
+      else if (etab.etat_administratif !== "A") reasons.ferme++;
+      else if (naf !== TARGET_NAF) reasons.horsActivite++;
+      else if (!postalCodes.includes(postalCode)) reasons.horsZone++;
+      else if (NON_DIFFUSIBLE.test(`${etab.adresse ?? ""} ${(etab.liste_enseignes ?? []).join(" ")}`)) reasons.diffusionRestreinte++;
+      else {
+        const enseigne = etab.liste_enseignes?.find((e) => e.trim()) ?? etab.nom_commercial ?? "";
+        const name = titleCase((enseigne || unite.nom_complet || unite.nom_raison_sociale || "").trim());
+        if (!name) {
+          reasons.sansNom++;
+          continue;
+        }
+        candidates.push({
+          siret,
+          siren: unite.siren,
+          name,
+          address: titleCase(etab.adresse ?? ""),
+          postalCode,
+          city: titleCase(etab.libelle_commune ?? ""),
+          zone,
+          nafCode: naf,
+          companyCreatedOn: parseDate(unite.date_creation),
+          workforceRange: etab.tranche_effectif_salarie ?? unite.tranche_effectif_salarie ?? "",
+          establishmentsCount: unite.nombre_etablissements_ouverts ?? null,
+          sourceUrl: annuaireUrl(siret),
+          sourceFetchedAt: fetchedAt,
+        });
       }
-      const enseigne = etab.liste_enseignes?.find((e) => e.trim()) ?? etab.nom_commercial ?? "";
-      const name = titleCase((enseigne || unite.nom_complet || unite.nom_raison_sociale || "").trim());
-      if (!name) {
-        skipped++;
-        continue;
-      }
-      candidates.push({
-        siret,
-        siren: unite.siren,
-        name,
-        address: titleCase(etab.adresse ?? ""),
-        postalCode,
-        city: titleCase(etab.libelle_commune ?? ""),
-        zone,
-        nafCode: naf,
-        companyCreatedOn: parseDate(unite.date_creation),
-        workforceRange: etab.tranche_effectif_salarie ?? unite.tranche_effectif_salarie ?? "",
-        establishmentsCount: unite.nombre_etablissements_ouverts ?? null,
-        sourceUrl: annuaireUrl(siret),
-        sourceFetchedAt: fetchedAt,
-      });
     }
   }
-  return { candidates, skipped, totalPages: data.total_pages ?? 1 };
+  const skipped = Object.values(reasons).reduce((a, b) => a + b, 0);
+  return { candidates, skipped, reasons, missingFields: [...missing].sort(), totalPages: data.total_pages ?? 1, totalResults: data.total_results ?? null };
 }
 
 export type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
@@ -164,13 +194,16 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export async function discoverZone(
   zone: ZoneKey,
   opts: { maxPages: number; fetchImpl?: FetchLike; intervalMs?: number },
-): Promise<{ candidates: LeadCandidate[]; skipped: number; pages: number; requests: string[] }> {
+): Promise<{ candidates: LeadCandidate[]; skipped: number; reasons: SkipReasons; missingFields: string[]; pages: number; totalResults: number | null; requests: string[] }> {
   const doFetch = opts.fetchImpl ?? fetch;
   const interval = opts.intervalMs ?? MIN_INTERVAL_MS;
   const candidates: LeadCandidate[] = [];
   const requests: string[] = [];
+  const reasons = emptyReasons();
+  const missing = new Set<string>();
   let skipped = 0;
   let pages = 0;
+  let totalResults: number | null = null;
 
   for (let page = 1; page <= opts.maxPages; page++) {
     const url = buildSireneUrl(zone, page);
@@ -185,8 +218,11 @@ export async function discoverZone(
     const mapped = mapSireneResults(await response.json(), zone, new Date());
     candidates.push(...mapped.candidates);
     skipped += mapped.skipped;
+    for (const [k, v] of Object.entries(mapped.reasons)) reasons[k as keyof SkipReasons] += v;
+    for (const f of mapped.missingFields) missing.add(f);
+    totalResults = mapped.totalResults;
     pages++;
     if (page >= mapped.totalPages) break;
   }
-  return { candidates, skipped, pages, requests };
+  return { candidates, skipped, reasons, missingFields: [...missing].sort(), pages, totalResults, requests };
 }
