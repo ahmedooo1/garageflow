@@ -5,7 +5,7 @@ import { prisma } from "@/server/db";
 import { sendMailBestEffort } from "@/server/lib/mailer";
 import { getAppUrl } from "@/server/lib/request";
 import { emailField, parseOrThrow, requiredText } from "@/server/lib/validation";
-import { logActivity, rescoreLead } from "./leads";
+import { findExistingLead, logActivity, rescoreLead } from "./leads";
 
 /**
  * Demande de démonstration depuis le site public. Les informations sont
@@ -37,9 +37,7 @@ export async function submitDemoRequest(input: DemoRequestInput): Promise<{ lead
   const formUrl = `${getAppUrl()}/#demo`;
 
   // Même garage déjà connu (même email, ou même nom et code postal) : on complète la fiche.
-  const existing =
-    (await prisma.lead.findFirst({ where: { email } })) ??
-    (await prisma.lead.findUnique({ where: { dedupeKey: dedupeKey({ name: data.garageName, postalCode }) } }));
+  const existing = await findExistingLead({ name: data.garageName, postalCode, email });
 
   let leadId: string;
   if (existing) {
@@ -79,6 +77,10 @@ export async function submitDemoRequest(input: DemoRequestInput): Promise<{ lead
     leadId = lead.id;
   }
   await logActivity(leadId, "demo_request", `Demande de démonstration${data.message ? ` : ${data.message.slice(0, 300)}` : ""}`);
+  if (existing?.optedOutAt) {
+    // La demande est explicite, mais l'opposition antérieure reste enregistrée : la réponse se fait à la main.
+    await logActivity(leadId, "note", "Ce garage s'était opposé à la prospection : répondez à sa demande depuis votre messagerie, sans réactiver la prospection.");
+  }
   await rescoreLead(leadId);
 
   // Notification interne uniquement (aucun message n'est envoyé au demandeur).

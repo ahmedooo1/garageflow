@@ -16,6 +16,7 @@ import {
   addLeadNote,
   createManualLead,
   enrichLeadWebsite,
+  eraseLead,
   importCsvLeads,
   logReply,
   setFollowUp,
@@ -87,6 +88,18 @@ export async function updateContactAction(_prev: ActionState, form: FormData): P
     await updateLeadContact(leadId, formToObject(form) as Parameters<typeof updateLeadContact>[1], admin.id);
   });
   if (result.ok) refreshLead(leadId);
+  return result;
+}
+
+export async function eraseLeadAction(_prev: ActionState, form: FormData): Promise<ActionState> {
+  const result = await runAction(async () => {
+    const admin = await requirePlatformAdminAction();
+    await eraseLead(str(form, "leadId"), admin.id, str(form, "reason") || "Effacement demandé");
+  });
+  if (result.ok) {
+    revalidatePath("/admin/prospects");
+    redirect("/admin/prospects");
+  }
   return result;
 }
 

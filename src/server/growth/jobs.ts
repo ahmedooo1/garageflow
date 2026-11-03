@@ -6,7 +6,7 @@ import { prisma } from "@/server/db";
 import { sendMailBestEffort } from "@/server/lib/mailer";
 import { getAppUrl } from "@/server/lib/request";
 import { audit } from "@/server/services/audit";
-import { enrichLeadWebsite, rescoreAll, syncConversions, upsertSireneCandidate } from "./leads";
+import { enrichLeadWebsite, rescoreAll, retentionDue, syncConversions, upsertSireneCandidate } from "./leads";
 import { formatRate, growthMetrics } from "./metrics";
 import { createDraft } from "./outreach";
 import { discoverZone, type FetchLike } from "./sirene";
@@ -147,6 +147,7 @@ async function drafts(ctx: JobContext): Promise<Stats> {
 export async function weeklyReportText(now = new Date()): Promise<string> {
   const m = await growthMetrics(now);
   const due = await prisma.lead.findMany({ where: { nextFollowUpAt: { lte: now } }, select: { id: true, name: true }, take: 20 });
+  const toErase = await retentionDue(now);
   const lines = [
     `Rapport GarageFlow, semaine ${isoWeek(now)}`,
     "",
@@ -167,6 +168,7 @@ export async function weeklyReportText(now = new Date()): Promise<string> {
     `- Demandes de démo (30 j) : ${m.sales.demoRequests30}`,
     `- Brouillons à relire : ${m.sales.pendingReview}`,
     `- Dépense rédaction assistée ce mois : ${m.aiSpendUsd.toFixed(2)} $`,
+    `- Prospects à effacer (plus de 3 ans sans échange) : ${toErase}`,
     "",
     due.length ? "Relances à faire" : "Aucune relance en retard.",
     ...due.map((d) => `- ${d.name} : ${getAppUrl()}/admin/prospects/${d.id}`),

@@ -2,6 +2,7 @@ import type { DraftKind, Lead } from "@prisma/client";
 import { CLOSED_STAGES, DRAFT_KIND_LABELS, workforceLabel } from "@/lib/growth/labels";
 import type { WebsiteSignals } from "@/lib/growth/scoring";
 import { zoneLabel } from "@/lib/growth/zones";
+import { TRIAL_DAYS } from "@/lib/plans";
 import { prisma } from "@/server/db";
 import { hmacSign, safeEqual } from "@/server/lib/crypto";
 import { AppError, NotFoundError } from "@/server/lib/errors";
@@ -11,7 +12,7 @@ import { audit } from "@/server/services/audit";
 import { generateAiDraft, type DraftFacts } from "./ai";
 import { logActivity } from "./leads";
 import { addSuppression, isSuppressed } from "./suppression";
-import { getSenderIdentity, intEnv, isGrowthPaused, missingSenderFields } from "./settings";
+import { getSenderIdentity, intEnv, isGrowthPaused, outreachConfigProblems, smtpOutreachProblems } from "./settings";
 
 /**
  * Messages de prospection : préparés automatiquement ou à la demande, jamais
@@ -48,7 +49,10 @@ export async function processUnsubscribe(token: string): Promise<boolean> {
   if (!lead) return true; // Prospect déjà effacé : rien à faire, réponse identique.
   if (lead.stage === "DO_NOT_CONTACT" && lead.optedOutAt) return true;
   await prisma.$transaction(async (tx) => {
-    if (lead.email) await addSuppression("EMAIL", lead.email, { reason: "Lien de désinscription", origin: "unsubscribe_link" }, tx);
+    // Toutes les adresses réellement écrites, pas seulement l'adresse actuelle de la fiche.
+    const sent = await tx.outreachDraft.findMany({ where: { leadId, status: "SENT" }, select: { toEmail: true } });
+    const emails = new Set([lead.email, ...sent.map((d) => d.toEmail)].filter(Boolean));
+    for (const email of emails) await addSuppression("EMAIL", email, { reason: "Lien de désinscription", origin: "unsubscribe_link" }, tx);
     if (lead.siret) await addSuppression("SIRET", lead.siret, { reason: "Lien de désinscription", origin: "unsubscribe_link" }, tx);
     await tx.lead.update({ where: { id: leadId }, data: { stage: "DO_NOT_CONTACT", optedOutAt: new Date(), nextFollowUpAt: null } });
     await tx.outreachDraft.updateMany({ where: { leadId, status: { in: ["DRAFT", "APPROVED"] } }, data: { status: "DISCARDED" } });
@@ -79,7 +83,7 @@ export function legalFooter(lead: Lead): string {
   return [
     "--",
     [id.name, id.company].filter(Boolean).join(", ") || "[Identité de l'expéditeur à compléter]",
-    id.address || "[Adresse postale à compléter]",
+    [id.address || "[Adresse postale à compléter]", id.siren ? `SIREN ${id.siren}` : ""].filter(Boolean).join(" · "),
     "",
     provenance(lead),
     `Pour ne plus recevoir de message de notre part : ${unsubscribeUrl(lead.id)}`,
@@ -104,7 +108,7 @@ export function templateDraft(lead: Lead, kind: DraftKind, previousSubject: stri
         "",
         "Je me permets une seule relance au sujet de mon message précédent. Si la question de l'accord client sur les travaux ne se pose pas chez vous, dites-le-moi simplement et je ne vous écrirai plus.",
         "",
-        `Sinon, l'essai est gratuit pendant 14 jours, sans carte bancaire : ${TRIAL_LINK_PLACEHOLDER}`,
+        `Sinon, l'essai est gratuit pendant ${TRIAL_DAYS} jours, sans carte bancaire : ${TRIAL_LINK_PLACEHOLDER}`,
         "",
         "Bonne journée,",
         firstName,
@@ -140,7 +144,7 @@ export function templateDraft(lead: Lead, kind: DraftKind, previousSubject: stri
       "",
       "Dans beaucoup d'ateliers, obtenir l'accord d'un client sur un devis demande plusieurs appels. Avec GarageFlow, le client reçoit un lien avec le diagnostic, les photos et le prix de chaque ligne, et accepte ou refuse ligne par ligne. Son accord est horodaté et reste dans le dossier.",
       "",
-      "Est-ce un sujet chez vous ? Je peux vous le montrer en 20 minutes, à l'atelier ou en visio. Vous pouvez aussi l'essayer 14 jours gratuitement, sans carte bancaire :",
+      `Est-ce un sujet chez vous ? Je peux vous le montrer en 20 minutes, à l'atelier ou en visio. Vous pouvez aussi l'essayer ${TRIAL_DAYS} jours gratuitement, sans carte bancaire :`,
       TRIAL_LINK_PLACEHOLDER,
       "",
       "Bonne journée,",
@@ -235,8 +239,8 @@ export async function approveDraft(draftId: string, actorId: string) {
   if (draft.status !== "DRAFT") throw new AppError("Seul un brouillon peut être approuvé");
   await assertContactable(draft.lead);
   if (!draft.lead.email) throw new AppError("Aucune adresse email sourcée pour ce prospect");
-  const missing = missingSenderFields();
-  if (missing.length) throw new AppError(`Identité de l'expéditeur incomplète : ${missing.join(", ")}`);
+  const problems = outreachConfigProblems();
+  if (problems.length) throw new AppError(`Configuration incomplète : ${problems.join(" ; ")}`);
   if (draft.body.includes("[Identité") || draft.body.includes("[Adresse") || draft.body.includes("[Prénom]")) {
     throw new AppError("Le message contient encore un champ à compléter");
   }
@@ -290,8 +294,8 @@ async function recordSent(draft: { id: string; leadId: string; kind: DraftKind }
 /** Envoi SMTP d'un message approuvé, un par un, sur action explicite d'un admin. */
 export async function sendApprovedDraft(draftId: string, actorId: string) {
   if (!sendingEnabled()) throw new AppError("Envoi depuis GarageFlow désactivé (OUTREACH_SEND_ENABLED). Envoyez depuis votre messagerie puis marquez le message comme envoyé.");
-  const missing = missingSenderFields();
-  if (missing.length) throw new AppError(`Identité de l'expéditeur incomplète : ${missing.join(", ")}`);
+  const problems = [...outreachConfigProblems(), ...smtpOutreachProblems()];
+  if (problems.length) throw new AppError(`Configuration incomplète : ${problems.join(" ; ")}`);
   const draft = await assertSendable(draftId);
   // Verrou optimiste : un double clic n'envoie qu'une fois.
   const claimed = await prisma.outreachDraft.updateMany({ where: { id: draftId, status: "APPROVED" }, data: { status: "SENT", sentAt: new Date(), sentById: actorId, sentVia: "smtp" } });

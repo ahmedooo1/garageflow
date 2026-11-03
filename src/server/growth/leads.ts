@@ -1,7 +1,7 @@
 import { Prisma, type LeadStage } from "@prisma/client";
 import { z } from "zod";
 import { CLOSED_STAGES, LEAD_STAGE_LABELS, LEAD_STAGES } from "@/lib/growth/labels";
-import { dedupeKey, emailDomain, isWebmailDomain, normalizeEmail, normalizeSiret, normalizeUrl, urlHost } from "@/lib/growth/normalize";
+import { dedupeKey, emailDomain, isWebmailDomain, normalizeEmail, normalizeName, normalizePostalCode, normalizeSiret, normalizeUrl, urlHost } from "@/lib/growth/normalize";
 import { QUALIFY_THRESHOLD, scoreLead, type ScoreResult, type WebsiteSignals } from "@/lib/growth/scoring";
 import { isZoneKey, zoneForPostalCode } from "@/lib/growth/zones";
 import { prisma, type Tx } from "@/server/db";
@@ -29,6 +29,35 @@ export async function logActivity(
 // Découverte et import
 // ---------------------------------------------------------------------------
 
+/**
+ * Retrouve un garage déjà connu, quelle que soit la source qui l'a apporté :
+ * même SIRET, même clé, même email, ou même nom normalisé dans le même code
+ * postal. Évite qu'un garage importé à la main puis trouvé dans SIRENE (ou
+ * l'inverse) existe deux fois.
+ */
+export async function findExistingLead(input: { siret?: string | null; name: string; postalCode?: string; email?: string }, tx: Db = prisma) {
+  const siret = normalizeSiret(input.siret ?? "");
+  if (siret) {
+    const bySiret = await tx.lead.findUnique({ where: { siret } });
+    if (bySiret) return bySiret;
+  }
+  const byKey = await tx.lead.findUnique({ where: { dedupeKey: dedupeKey({ siret, name: input.name, postalCode: input.postalCode, email: input.email }) } });
+  if (byKey) return byKey;
+  const email = normalizeEmail(input.email ?? "");
+  if (email) {
+    const byEmail = await tx.lead.findFirst({ where: { email } });
+    if (byEmail) return byEmail;
+  }
+  const postalCode = normalizePostalCode(input.postalCode ?? "");
+  const name = normalizeName(input.name);
+  if (postalCode && name) {
+    const samePostal = await tx.lead.findMany({ where: { postalCode }, take: 500 });
+    const match = samePostal.find((l) => normalizeName(l.name) === name && (!siret || !l.siret || l.siret === siret));
+    if (match) return match;
+  }
+  return null;
+}
+
 export type UpsertOutcome = "created" | "updated" | "unchanged" | "suppressed";
 
 /**
@@ -39,7 +68,7 @@ export type UpsertOutcome = "created" | "updated" | "unchanged" | "suppressed";
 export async function upsertSireneCandidate(c: LeadCandidate, opts: { dryRun?: boolean } = {}): Promise<UpsertOutcome> {
   if (await isSuppressed({ siret: c.siret })) return "suppressed";
   const key = dedupeKey({ siret: c.siret, name: c.name, postalCode: c.postalCode });
-  const existing = await prisma.lead.findUnique({ where: { dedupeKey: key }, select: { id: true, name: true, workforceRange: true, establishmentsCount: true, address: true } });
+  const existing = await findExistingLead({ siret: c.siret, name: c.name, postalCode: c.postalCode });
   if (opts.dryRun) return existing ? "updated" : "created";
 
   const registry = {
@@ -53,17 +82,31 @@ export async function upsertSireneCandidate(c: LeadCandidate, opts: { dryRun?: b
     companyCreatedOn: c.companyCreatedOn,
     workforceRange: c.workforceRange,
     establishmentsCount: c.establishmentsCount,
-    sourceUrl: c.sourceUrl,
-    sourceFetchedAt: c.sourceFetchedAt,
   };
   if (existing) {
     const changed =
-      existing.name !== c.name || existing.workforceRange !== c.workforceRange || existing.establishmentsCount !== c.establishmentsCount || existing.address !== c.address;
-    await prisma.lead.update({ where: { id: existing.id }, data: registry });
+      existing.siret !== c.siret ||
+      existing.name !== c.name ||
+      existing.workforceRange !== c.workforceRange ||
+      existing.establishmentsCount !== c.establishmentsCount ||
+      existing.address !== c.address;
+    // Un garage d'abord saisi à la main ou importé reçoit son SIRET ; sa source d'origine est conservée.
+    const fromRegistry = existing.source === "SIRENE";
+    await prisma.lead.update({
+      where: { id: existing.id },
+      data: {
+        ...registry,
+        siret: c.siret,
+        dedupeKey: key,
+        sourceUrl: fromRegistry ? c.sourceUrl : undefined,
+        sourceFetchedAt: fromRegistry ? c.sourceFetchedAt : undefined,
+      },
+    });
+    if (!existing.siret) await logActivity(existing.id, "registry", "Rapproché de la base SIRENE", { metadata: { sourceUrl: c.sourceUrl } });
     if (changed) await rescoreLead(existing.id);
     return changed ? "updated" : "unchanged";
   }
-  const lead = await prisma.lead.create({ data: { ...registry, siret: c.siret, dedupeKey: key, source: "SIRENE" } });
+  const lead = await prisma.lead.create({ data: { ...registry, sourceUrl: c.sourceUrl, sourceFetchedAt: c.sourceFetchedAt, siret: c.siret, dedupeKey: key, source: "SIRENE" } });
   await logActivity(lead.id, "discovered", "Trouvé dans la base SIRENE (établissement actif, code NAF 45.20A)", { metadata: { sourceUrl: c.sourceUrl } });
   await rescoreLead(lead.id);
   return "created";
@@ -78,7 +121,7 @@ export async function importCsvLeads(rows: CsvLead[], actorId: string): Promise<
       continue;
     }
     const key = dedupeKey({ siret: row.siret, name: row.name, postalCode: row.postalCode, email: row.email });
-    const existing = await prisma.lead.findUnique({ where: { dedupeKey: key } });
+    const existing = await findExistingLead({ siret: row.siret, name: row.name, postalCode: row.postalCode, email: row.email });
     if (existing) {
       // On complète, on n'efface pas : seuls les champs vides reçoivent la valeur importée.
       await prisma.lead.update({
@@ -140,7 +183,7 @@ export async function createManualLead(input: z.input<typeof manualLeadSchema>, 
   if (data.siret && !siret) throw new AppError("SIRET invalide (14 chiffres)");
   if (await isSuppressed({ siret })) throw new AppError("Ce garage s'est opposé à la prospection");
   const key = dedupeKey({ siret, name: data.name, postalCode: data.postalCode });
-  if (await prisma.lead.findUnique({ where: { dedupeKey: key }, select: { id: true } })) throw new AppError("Ce garage est déjà dans la liste");
+  if (await findExistingLead({ siret, name: data.name, postalCode: data.postalCode })) throw new AppError("Ce garage est déjà dans la liste");
   const lead = await prisma.lead.create({
     data: {
       siret: siret || null,
@@ -393,20 +436,57 @@ export async function linkSignupToLead(garageId: string, email: string): Promise
   return lead.id;
 }
 
-/** Les prospects inscrits suivent l'état réel de leur abonnement. */
+/**
+ * Les prospects inscrits suivent l'état réel de leur abonnement : « en essai »,
+ * puis « client » dès qu'un abonnement payant est actif. Un client qui résilie
+ * reste « client » ici (la résiliation est comptée dans les indicateurs) : on
+ * ne le fait jamais repasser « en essai ».
+ */
 export async function syncConversions(): Promise<{ converted: number }> {
   const linked = await prisma.lead.findMany({
-    where: { garageId: { not: null }, stage: { in: ["TRIAL", "CONVERTED"] } },
-    select: { id: true, stage: true, garage: { select: { subscriptionStatus: true } } },
+    where: { garageId: { not: null }, stage: "TRIAL" },
+    select: { id: true, garage: { select: { subscriptionStatus: true } } },
   });
   let converted = 0;
   for (const l of linked) {
-    const target: LeadStage = l.garage?.subscriptionStatus === "ACTIVE" || l.garage?.subscriptionStatus === "PAST_DUE" ? "CONVERTED" : "TRIAL";
-    if (target !== l.stage) {
-      await prisma.lead.update({ where: { id: l.id }, data: { stage: target } });
-      await logActivity(l.id, "stage", target === "CONVERTED" ? "Abonnement payant actif" : "Retour en essai ou abonnement interrompu");
-      if (target === "CONVERTED") converted++;
+    if (l.garage?.subscriptionStatus === "ACTIVE" || l.garage?.subscriptionStatus === "PAST_DUE") {
+      await prisma.lead.update({ where: { id: l.id }, data: { stage: "CONVERTED" } });
+      await logActivity(l.id, "stage", "Abonnement payant actif");
+      converted++;
     }
   }
   return { converted };
+}
+
+/**
+ * Effacement d'un prospect (droit à l'effacement, RGPD art. 17, ou fin de la
+ * durée de conservation). La fiche, son historique et ses brouillons sont
+ * supprimés ; seuls l'email et le SIRET rejoignent la liste d'opposition, pour
+ * que le garage ne soit pas collecté à nouveau.
+ */
+export async function eraseLead(leadId: string, actorId: string, reason = "Effacement demandé") {
+  const lead = await prisma.lead.findUnique({ where: { id: leadId } });
+  if (!lead) throw new NotFoundError("Prospect introuvable");
+  await prisma.$transaction(async (tx) => {
+    const sent = await tx.outreachDraft.findMany({ where: { leadId }, select: { toEmail: true } });
+    for (const email of new Set([lead.email, ...sent.map((d) => d.toEmail)].filter(Boolean))) {
+      await addSuppression("EMAIL", email, { reason, origin: "erasure" }, tx);
+    }
+    if (lead.siret) await addSuppression("SIRET", lead.siret, { reason, origin: "erasure" }, tx);
+    await tx.aiUsage.updateMany({ where: { leadId }, data: { leadId: null } });
+    await tx.lead.delete({ where: { id: leadId } });
+  });
+  // Journal sans donnée personnelle : seul l'identifiant technique est conservé.
+  await audit({ userId: actorId, action: "growth.lead_erased", entityType: "Lead", entityId: leadId });
+}
+
+/** Prospects sans échange depuis plus de 3 ans : à effacer (durée annoncée dans la politique de confidentialité). */
+export async function retentionDue(now = new Date()): Promise<number> {
+  const limit = new Date(now.getTime() - 3 * 365.25 * 24 * 60 * 60 * 1000);
+  return prisma.lead.count({
+    where: {
+      stage: { notIn: ["TRIAL", "CONVERTED"] },
+      OR: [{ lastContactedAt: { lt: limit } }, { lastContactedAt: null, createdAt: { lt: limit } }],
+    },
+  });
 }

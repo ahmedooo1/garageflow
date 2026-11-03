@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { normalizePostalCode, normalizeSiret } from "@/lib/growth/normalize";
 import { TARGET_NAF, ZONES, type ZoneKey } from "@/lib/growth/zones";
+import { getAppUrl } from "@/server/lib/request";
 
 /**
  * Connecteur « API Recherche d'entreprises » (DINUM, données SIRENE de l'INSEE,
@@ -14,7 +15,10 @@ import { TARGET_NAF, ZONES, type ZoneKey } from "@/lib/growth/zones";
  */
 
 export const SIRENE_API = "https://recherche-entreprises.api.gouv.fr/search";
-export const USER_AGENT = "GarageFlow-prospection/1.0 (+https://garageflow.aaweb.fr/confidentialite)";
+/** Agent identifié, avec la page qui explique la collecte (domaine lu dans APP_URL). */
+export function userAgent(): string {
+  return `GarageFlow-prospection/1.0 (+${getAppUrl()}/confidentialite#prospection)`;
+}
 const PER_PAGE = 25;
 const MIN_INTERVAL_MS = 400;
 
@@ -174,7 +178,7 @@ export async function discoverZone(
     for (let attempt = 0; attempt < 3; attempt++) {
       if (requests.length > 0 || attempt > 0) await sleep(interval * (attempt + 1));
       requests.push(url);
-      response = await doFetch(url, { headers: { Accept: "application/json", "User-Agent": USER_AGENT }, signal: AbortSignal.timeout(15_000) });
+      response = await doFetch(url, { headers: { Accept: "application/json", "User-Agent": userAgent() }, signal: AbortSignal.timeout(15_000) });
       if (response.status !== 429) break;
     }
     if (!response || !response.ok) throw new Error(`SIRENE ${zone} page ${page} : HTTP ${response?.status ?? "?"}`);

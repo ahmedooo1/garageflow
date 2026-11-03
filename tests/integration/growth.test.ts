@@ -3,7 +3,7 @@ import { prisma } from "@/server/db";
 import { AppError } from "@/server/lib/errors";
 import { submitDemoRequest } from "@/server/growth/inbound";
 import { runJob } from "@/server/growth/jobs";
-import { enrichLeadWebsite, importCsvLeads, rescoreLead, setLeadStage, syncConversions, upsertSireneCandidate } from "@/server/growth/leads";
+import { enrichLeadWebsite, eraseLead, importCsvLeads, rescoreLead, retentionDue, setLeadStage, syncConversions, upsertSireneCandidate } from "@/server/growth/leads";
 import { growthMetrics } from "@/server/growth/metrics";
 import {
   approveDraft,
@@ -24,7 +24,12 @@ import { cleanupGarage, createTestGarage, PASSWORD, type TestGarage } from "./he
 
 /* Données fictives, créées pour ces tests uniquement. */
 
-const SENDER = { OUTREACH_SENDER_NAME: "Camille Testeur", OUTREACH_SENDER_COMPANY: "GarageFlow Test SAS", OUTREACH_SENDER_ADDRESS: "1 rue du Test, 76000 Rouen" };
+const SENDER = {
+  OUTREACH_SENDER_NAME: "Camille Testeur",
+  OUTREACH_SENDER_COMPANY: "GarageFlow Test SAS",
+  OUTREACH_SENDER_ADDRESS: "1 rue du Test, 76000 Rouen",
+  OUTREACH_FROM: "Camille <camille@garageflow-test.example>",
+};
 
 async function wipeGrowth() {
   await prisma.$transaction([
@@ -339,5 +344,82 @@ describe("audience", () => {
     const rows = await prisma.pageView.findMany();
     expect(rows).toHaveLength(1);
     expect(rows[0].count).toBe(2);
+  });
+});
+
+describe("corrections de la revue", () => {
+  it("un garage importé puis trouvé dans SIRENE n'existe qu'une fois et reçoit son SIRET", async () => {
+    const id = await adminId();
+    await importCsvLeads(
+      [{ name: "SARL Garage du Test", address: "", postalCode: "76500", city: "Elbeuf", zone: "elbeuf", siret: "", website: "", email: "", phone: "", sourceUrl: "https://pagesjaunes.example/garage-du-test" }],
+      id,
+    );
+    expect(await upsertSireneCandidate(candidate())).toBe("updated");
+    const leads = await prisma.lead.findMany();
+    expect(leads).toHaveLength(1);
+    expect(leads[0].siret).toBe("11111111100011");
+    expect(leads[0].source).toBe("CSV_IMPORT");
+    expect(leads[0].sourceUrl).toBe("https://pagesjaunes.example/garage-du-test");
+  });
+
+  it("la désinscription exclut aussi l'adresse réellement écrite, même si la fiche a changé depuis", async () => {
+    const id = await adminId();
+    const lead = await contactableLead();
+    const draft = await createDraft(lead.id, "FIRST_CONTACT");
+    await approveDraft(draft.id, id);
+    await markDraftSentManually(draft.id, id);
+    await prisma.lead.update({ where: { id: lead.id }, data: { email: "nouvelle@garage-fictif.test" } });
+    await processUnsubscribe(unsubscribeToken(lead.id));
+    expect(await isSuppressed({ email: "contact@garage-fictif.test" })).toBe(true);
+    expect(await isSuppressed({ email: "nouvelle@garage-fictif.test" })).toBe(true);
+  });
+
+  it("un client qui résilie ne repasse pas « en essai »", async () => {
+    const lead = await contactableLead();
+    await prisma.lead.update({ where: { id: lead.id }, data: { email: "resiliation@garage-fictif.test" } });
+    const { garage } = await registerGarage({ garageName: "Garage Résiliation", firstName: "A", lastName: "B", email: "resiliation@garage-fictif.test", password: PASSWORD });
+    garages.push(garage.id);
+    await activateManually(garage.id, { plan: "ATELIER", months: 1 }, await adminId());
+    await syncConversions();
+    await prisma.garage.update({ where: { id: garage.id }, data: { subscriptionStatus: "CANCELED" } });
+    await syncConversions();
+    expect((await prisma.lead.findUniqueOrThrow({ where: { id: lead.id } })).stage).toBe("CONVERTED");
+    expect((await growthMetrics()).product.canceled).toBeGreaterThanOrEqual(1);
+  });
+
+  it("l'effacement supprime la fiche et garde seulement l'opposition", async () => {
+    const id = await adminId();
+    const lead = await contactableLead();
+    await createDraft(lead.id, "FIRST_CONTACT");
+    await eraseLead(lead.id, id);
+    expect(await prisma.lead.count()).toBe(0);
+    expect(await prisma.leadActivity.count({ where: { leadId: lead.id } })).toBe(0);
+    expect(await prisma.outreachDraft.count({ where: { leadId: lead.id } })).toBe(0);
+    expect(await isSuppressed({ email: "contact@garage-fictif.test", siret: "11111111100011" })).toBe(true);
+    expect(await upsertSireneCandidate(candidate())).toBe("suppressed");
+    const log = await prisma.auditLog.findFirstOrThrow({ where: { action: "growth.lead_erased", entityId: lead.id } });
+    expect(JSON.stringify(log)).not.toMatch(/garage-fictif|Garage Du Test/);
+  });
+
+  it("compte les prospects arrivés au terme de la conservation", async () => {
+    await contactableLead();
+    const in4Years = new Date(Date.now() + 4 * 365 * 24 * 60 * 60 * 1000);
+    expect(await retentionDue()).toBe(0);
+    expect(await retentionDue(in4Years)).toBe(1);
+  });
+
+  it("refuse l'approbation sans APP_URL publique en production, et l'envoi SMTP depuis une adresse no-reply", async () => {
+    const id = await adminId();
+    const lead = await contactableLead();
+    const draft = await createDraft(lead.id, "FIRST_CONTACT");
+    const env = process.env as Record<string, string | undefined>;
+    env.NODE_ENV = "production";
+    env.APP_URL = "http://localhost:3000";
+    await expect(approveDraft(draft.id, id)).rejects.toThrow(/APP_URL/);
+    env.NODE_ENV = "test";
+    await approveDraft(draft.id, id);
+    process.env.OUTREACH_SEND_ENABLED = "true";
+    process.env.OUTREACH_FROM = "GarageFlow <no-reply@garageflow-test.example>";
+    await expect(sendApprovedDraft(draft.id, id)).rejects.toThrow(/OUTREACH_FROM/);
   });
 });

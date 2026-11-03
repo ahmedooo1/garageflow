@@ -11,6 +11,7 @@ import {
   createDraftAction,
   discardDraftAction,
   enrichWebsiteAction,
+  eraseLeadAction,
   logReplyAction,
   markSentAction,
   sendDraftAction,
@@ -234,5 +235,18 @@ export function DraftCard({ leadId, draft, email, sendEnabled }: { leadId: strin
         </div>
       )}
     </div>
+  );
+}
+
+export function EraseForm({ leadId }: { leadId: string }) {
+  return (
+    <InlineAction
+      action={eraseLeadAction}
+      hidden={{ leadId }}
+      variant="danger"
+      confirm="Effacer définitivement ce prospect ? Sa fiche, son historique et ses messages seront supprimés ; seuls son email et son SIRET resteront dans la liste d'opposition."
+    >
+      Effacer ce prospect
+    </InlineAction>
   );
 }

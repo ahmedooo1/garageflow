@@ -10,8 +10,8 @@ import { isAppError } from "@/server/lib/errors";
 import { aiAvailability } from "@/server/growth/ai";
 import { getLead } from "@/server/growth/leads";
 import { sendingEnabled } from "@/server/growth/outreach";
-import { missingSenderFields } from "@/server/growth/settings";
-import { ContactForm, DraftCard, FollowUpForm, NewDraftForm, NoteForm, ReplyForm, StageForm } from "./lead-forms";
+import { outreachConfigProblems } from "@/server/growth/settings";
+import { ContactForm, DraftCard, EraseForm, FollowUpForm, NewDraftForm, NoteForm, ReplyForm, StageForm } from "./lead-forms";
 
 export const metadata: Metadata = { title: "Prospect", robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
@@ -38,7 +38,7 @@ export default async function ProspectPage({ params }: { params: Promise<{ id: s
   const evidence = (lead.scoreEvidence as Evidence[] | null) ?? [];
   const signals = lead.websiteSignals as WebsiteSignals | null;
   const ai = await aiAvailability();
-  const missing = missingSenderFields();
+  const missing = outreachConfigProblems();
   const openDraft = lead.drafts.some((d) => d.status === "DRAFT" || d.status === "APPROVED");
 
   return (
@@ -117,7 +117,7 @@ export default async function ProspectPage({ params }: { params: Promise<{ id: s
           <Card title="Messages">
             {missing.length > 0 && (
               <Alert tone="warn" className="mb-3">
-                Identité de l&apos;expéditeur incomplète ({missing.join(", ")}) : les brouillons peuvent être préparés mais pas approuvés.
+                Configuration incomplète ({missing.join(" ; ")}) : les brouillons peuvent être préparés mais pas approuvés.
               </Alert>
             )}
             {!openDraft && !lead.optedOutAt && (
@@ -173,6 +173,10 @@ export default async function ProspectPage({ params }: { params: Promise<{ id: s
                 <ReplyForm leadId={lead.id} />
               </div>
               {lead.objection && <p className="text-sm">Objection : {lead.objection}</p>}
+              <div className="border-t border-line pt-4">
+                <p className="mb-2 text-xs text-muted">Demande d&apos;effacement (RGPD) ou fin de la durée de conservation.</p>
+                <EraseForm leadId={lead.id} />
+              </div>
             </div>
           </Card>
           <Card title="Historique">

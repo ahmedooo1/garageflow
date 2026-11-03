@@ -52,6 +52,11 @@ describe("accès à la prospection", () => {
       actions.setStageAction({ ok: false }, form({ leadId: "x", stage: "QUALIFIED" })),
       actions.updateGrowthSettingsAction({ ok: false }, form({ paused: "on" })),
       actions.addSuppressionAction({ ok: false }, form({ kind: "EMAIL", value: "a@b.test" })),
+      actions.eraseLeadAction({ ok: false }, form({ leadId: "x" })),
+      actions.createDraftAction({ ok: false }, form({ leadId: "x", kind: "FIRST_CONTACT" })),
+      actions.approveDraftAction({ ok: false }, form({ leadId: "x", draftId: "y" })),
+      actions.markSentAction({ ok: false }, form({ leadId: "x", draftId: "y" })),
+      actions.updateContactAction({ ok: false }, form({ leadId: "x", email: "a@b.test" })),
     ];
     for (const result of await Promise.all(calls)) {
       expect(result.ok).toBe(false);

@@ -9,7 +9,7 @@ import { aiModel } from "@/server/growth/ai";
 import { JOBS, listJobRuns } from "@/server/growth/jobs";
 import { formatRate, growthMetrics } from "@/server/growth/metrics";
 import { listDraftQueue, sendingEnabled } from "@/server/growth/outreach";
-import { getGrowthSettings, missingSenderFields } from "@/server/growth/settings";
+import { getGrowthSettings, missingSenderFields, outreachConfigProblems, smtpOutreachProblems } from "@/server/growth/settings";
 import { listSuppressions } from "@/server/growth/suppression";
 import { JobRunner, SettingsForm, SuppressionForm } from "./growth-forms";
 
@@ -39,6 +39,8 @@ export default async function GrowthPage() {
   await requirePlatformAdmin();
   const [m, runs, settings, queue, suppressions] = await Promise.all([growthMetrics(), listJobRuns(20), getGrowthSettings(), listDraftQueue(), listSuppressions(50)]);
   const missing = missingSenderFields();
+  const problems = outreachConfigProblems();
+  const smtpProblems = smtpOutreachProblems();
   const eur = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
 
   return (
@@ -136,13 +138,15 @@ export default async function GrowthPage() {
         <Card title="Configuration du serveur">
           <ul className="divide-y divide-line">
             <Check ok={missing.length === 0} label="Identité de l'expéditeur (nom, société, adresse)" />
+            <Check ok={problems.length === 0} label="Liens publics (APP_URL en https)" />
             <Check ok={sendingEnabled()} label="Envoi depuis GarageFlow (OUTREACH_SEND_ENABLED)" />
             <Check ok={(process.env.GROWTH_CRON_SECRET ?? "").length >= 32} label="Tâches planifiées (GROWTH_CRON_SECRET)" />
             <Check ok={Boolean(process.env.GROWTH_REPORT_TO)} label="Destinataire des rapports (GROWTH_REPORT_TO)" />
             <Check ok={Boolean(process.env.ANTHROPIC_API_KEY)} label="Rédaction assistée (ANTHROPIC_API_KEY)" />
             <Check ok={process.env.MAIL_TRANSPORT === "smtp"} label="Transport email SMTP" />
           </ul>
-          {missing.length > 0 && <p className="mt-2 text-xs text-muted">Manquant : {missing.join(", ")}</p>}
+          {problems.length > 0 && <p className="mt-2 text-xs text-muted">Avant d&apos;approuver : {problems.join(" ; ")}</p>}
+          {sendingEnabled() && smtpProblems.length > 0 && <p className="mt-1 text-xs text-muted">Avant d&apos;envoyer depuis GarageFlow : {smtpProblems.join(" ; ")}</p>}
         </Card>
 
         <Card title="Exécutions récentes">

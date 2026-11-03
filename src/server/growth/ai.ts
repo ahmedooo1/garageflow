@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
+import { formatPriceHt, PLANS, TRIAL_DAYS } from "@/lib/plans";
 import { prisma } from "@/server/db";
 import { getGrowthSettings } from "./settings";
 
@@ -82,7 +83,7 @@ Faits sur GarageFlow (les seuls que tu peux affirmer) :
 - Suivi de chaque véhicule de la réception à la restitution : état et photos à l'arrivée, diagnostic du technicien, travaux proposés, réparation, contrôle final, restitution, historique.
 - Le client valide les travaux depuis un lien reçu par email, sans créer de compte : il voit le diagnostic, les photos et le prix de chaque ligne, et accepte ou refuse ligne par ligne. L'accord est horodaté.
 - Tableau d'atelier lisible sur tablette ; rôles gérant, réception, technicien.
-- Formule Atelier 59 € HT par mois (5 comptes), formule Réseau 129 € HT par mois. Essai gratuit de 14 jours sans carte bancaire. Sans engagement.
+- Formule ${PLANS.ATELIER.name} ${formatPriceHt(PLANS.ATELIER)} HT par mois (${PLANS.ATELIER.seats} comptes), formule ${PLANS.RESEAU.name} ${formatPriceHt(PLANS.RESEAU)} HT par mois (${PLANS.RESEAU.seats} comptes). Essai gratuit de ${TRIAL_DAYS} jours sans carte bancaire. Sans engagement.
 
 Règles :
 - Vouvoiement, ton direct et sobre d'un artisan qui écrit à un autre professionnel. 120 mots maximum pour le corps.
