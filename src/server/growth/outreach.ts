@@ -164,7 +164,6 @@ function factsFor(lead: Lead, kind: DraftKind, previousSubject: string | null): 
     independent: lead.establishmentsCount === null ? null : lead.establishmentsCount <= 2,
     onlineBooking: ws?.reachable ? ws.onlineBooking : null,
     hasWebsite: Boolean(lead.website),
-    contactName: lead.contactName.slice(0, 80),
     hypothesis: lead.hypothesis.slice(0, 600),
     senderFirstName: (getSenderIdentity().name || "").split(/\s+/)[0] ?? "",
     previousSubject,
@@ -172,7 +171,9 @@ function factsFor(lead: Lead, kind: DraftKind, previousSubject: string | null): 
 }
 
 function finalize(lead: Lead, kind: DraftKind, body: string): string {
-  return `${body.replaceAll(TRIAL_LINK_PLACEHOLDER, trialLink(kind)).trim()}\n\n${legalFooter(lead)}`;
+  // La formule nominative est ajoutée ici : le nom du contact n'est jamais transmis au modèle.
+  const text = body.trim().replace(/^Bonjour\s*,/, greeting(lead));
+  return `${text.replaceAll(TRIAL_LINK_PLACEHOLDER, trialLink(kind)).trim()}\n\n${legalFooter(lead)}`;
 }
 
 async function assertContactable(lead: Lead) {

@@ -215,7 +215,7 @@ Total : **0 € sans rédaction assistée**, et au plus le budget fixé avec. Po
 
 ## 6. Déploiement
 
-Rien n'a été déployé. La branche n'est pas fusionnée.
+Rien n'a été déployé. La branche n'est pas fusionnée. La procédure détaillée et vérifiée est dans [AI_GROWTH_LAUNCH_CHECKLIST.md](AI_GROWTH_LAUNCH_CHECKLIST.md).
 
 1. **Relire et fusionner** la branche dans `master`. Le workflow de déploiement lance la CI, construit l'image, sauvegarde la base, puis applique
    la migration `20261103222021_growth_prospection` au démarrage. Cette migration ne fait qu'ajouter des tables, des types et une colonne
@@ -236,8 +236,9 @@ Rien n'a été déployé. La branche n'est pas fusionnée.
    # /usr/local/bin/garageflow-growth (chmod 700) ; secret dans /etc/garageflow-growth.secret (chmod 600)
    #!/bin/sh
    set -eu
-   curl -fsS -X POST -H "Authorization: Bearer $(cat /etc/garageflow-growth.secret)" \
-     "https://garageflow.aaweb.fr/api/growth/cron?job=$1"
+   # Appel direct du conteneur (port local du script de déploiement) : pas de délai du proxy web.
+   curl -fsS --max-time 600 -X POST -H "Authorization: Bearer $(cat /etc/garageflow-growth.secret)" \
+     "http://127.0.0.1:3031/api/growth/cron?job=$1"
    ```
 
    ```cron
@@ -258,9 +259,9 @@ Rien n'a été déployé. La branche n'est pas fusionnée.
   services réels, faute d'accès réseau depuis le développement.
 - SIRENE ne publie ni email ni téléphone. La plupart des prospects demanderont une recherche manuelle (site du garage, fiche Google), à saisir
   avec sa source. C'est voulu : aucune coordonnée n'est devinée.
-- La vérification DNS anti-SSRF se fait avant la requête ; une résolution DNS changeante entre les deux reste théoriquement possible. La fonction
-  n'est déclenchée que par un administrateur.
+- Protection SSRF : l'adresse est revérifiée au moment de la connexion (corrigé après la revue, voir la liste de lancement).
 - La limite de débit est en mémoire (une instance), comme le reste de l'application.
 - Les réponses aux messages ne sont pas lues automatiquement : vous les consignez dans la fiche.
-- La conservation de 3 ans est annoncée dans la politique de confidentialité, mais la purge n'est pas automatisée : à faire une fois par an.
+- La conservation de 3 ans est annoncée dans la politique de confidentialité. Le rapport hebdomadaire compte les fiches à effacer et la fiche
+  propose « Effacer ce prospect » ; l'effacement n'est pas automatique.
 - Le rapport hebdomadaire et la notification de démo nécessitent `MAIL_TRANSPORT=smtp` en production.

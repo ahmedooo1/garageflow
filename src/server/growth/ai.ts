@@ -69,7 +69,6 @@ export type DraftFacts = {
   independent: boolean | null;
   onlineBooking: boolean | null;
   hasWebsite: boolean;
-  contactName: string;
   hypothesis: string;
   senderFirstName: string;
   previousSubject: string | null;
@@ -91,7 +90,7 @@ Règles :
 - N'affirme rien sur le garage au-delà des faits fournis. Ne suppose rien sur son logiciel ou ses outils actuels. N'invente ni chiffre, ni client, ni témoignage, ni résultat.
 - Pas d'urgence artificielle, pas de superlatif, pas d'emoji, pas de mention d'intelligence artificielle.
 - N'écris aucune adresse web ni email. Si tu proposes l'essai, écris exactement {{LIEN_ESSAI}} à l'endroit du lien, une seule fois.
-- Termine par le prénom de l'expéditeur seul. N'ajoute ni mentions légales ni lien de désinscription : ils sont ajoutés ensuite.
+- Commence exactement par « Bonjour, » (la formule nominative est ajoutée ensuite). Termine par le prénom de l'expéditeur seul. N'ajoute ni mentions légales ni lien de désinscription : ils sont ajoutés ensuite.
 - kind FIRST_CONTACT : premier message. DEMO_INVITE : proposer une démonstration de 20 minutes à l'atelier ou en visio. FOLLOW_UP : courte relance unique et polie du message "previousSubject", qui laisse la porte ouverte.
 
 Réponds uniquement avec l'objet et le corps du message.`;
