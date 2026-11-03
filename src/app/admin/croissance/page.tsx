@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { requirePlatformAdmin } from "@/server/context";
 import Link from "next/link";
 import { Card, PageHeader, Pill } from "@/components/ui";
 import { formatDateTime } from "@/lib/format";
@@ -35,6 +36,7 @@ function Check({ ok, label }: { ok: boolean; label: string }) {
 }
 
 export default async function GrowthPage() {
+  await requirePlatformAdmin();
   const [m, runs, settings, queue, suppressions] = await Promise.all([growthMetrics(), listJobRuns(20), getGrowthSettings(), listDraftQueue(), listSuppressions(50)]);
   const missing = missingSenderFields();
   const eur = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });

@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
+import { requirePlatformAdmin } from "@/server/context";
 import { Card, PageHeader } from "@/components/ui";
 import { CSV_COLUMNS, MAX_IMPORT_ROWS } from "@/server/growth/csv";
 import { ImportForm, ManualLeadForm } from "./forms";
 
 export const metadata: Metadata = { title: "Ajouter des prospects", robots: { index: false, follow: false } };
 
-export default function NewProspectPage() {
+export default async function NewProspectPage() {
+  await requirePlatformAdmin();
   return (
     <>
       <PageHeader title="Ajouter des prospects" back={{ href: "/admin/prospects", label: "Prospects" }} />

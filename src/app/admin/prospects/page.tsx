@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { requirePlatformAdmin } from "@/server/context";
 import Link from "next/link";
 import { Download, Plus } from "lucide-react";
 import { Card, EmptyState, PageHeader, Pill } from "@/components/ui";
@@ -13,6 +14,7 @@ export const dynamic = "force-dynamic";
 type Search = { q?: string; stage?: string; zone?: string; minScore?: string; email?: string; demo?: string; due?: string };
 
 export default async function ProspectsPage({ searchParams }: { searchParams: Promise<Search> }) {
+  await requirePlatformAdmin();
   const sp = await searchParams;
   const leads = await listLeads({
     q: sp.q,

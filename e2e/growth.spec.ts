@@ -69,3 +69,32 @@ test("robots.txt exclut la console et pointe vers le plan du site", async ({ req
   expect(robots).toContain("Disallow: /admin/");
   expect(robots).toMatch(/Sitemap: .*\/sitemap\.xml/);
 });
+
+test("la redirection de /admin ne transporte aucune donnée (anonyme ou garage)", async ({ page, request }) => {
+  // Régression : la vérification du layout seul laissait la page se rendre dans le corps de la redirection.
+  const marker = `Garage Fuite ${Date.now().toString(36)}`;
+  await page.goto("/#demo");
+  const demo = page.locator("#demo");
+  await demo.getByLabel("Votre nom").fill("Test Fuite");
+  await demo.getByLabel("Nom du garage").fill(marker);
+  await demo.getByLabel("Email").fill(`fuite-${Date.now().toString(36)}@garage-e2e.test`);
+  await demo.getByLabel("Code postal du garage").fill("76000");
+  await demo.getByRole("button", { name: "Demander une démonstration" }).click();
+  await expect(demo.getByText("Merci, c'est noté.")).toBeVisible();
+
+  const paths = ["/admin", "/admin/prospects", "/admin/croissance", "/admin/prospects/new"];
+  for (const path of paths) {
+    const anon = await request.get(path, { maxRedirects: 0 });
+    expect(anon.status(), path).toBe(307);
+    expect(await anon.text(), `${path} anonyme`).not.toMatch(new RegExp(`${marker}|Revenu mensuel|@garage-e2e\\.test`));
+  }
+
+  const garage = await page.context().browser()!.newPage();
+  await register(garage, `curieux-${Date.now().toString(36)}@garage-e2e.test`);
+  for (const path of paths) {
+    const res = await garage.request.get(path, { maxRedirects: 0 });
+    expect(res.status(), path).toBe(307);
+    expect(await res.text(), `${path} gérant de garage`).not.toMatch(new RegExp(`${marker}|Revenu mensuel|garageflow-e2e\\.test`));
+  }
+  await garage.close();
+});

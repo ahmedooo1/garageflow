@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { requirePlatformAdmin } from "@/server/context";
 import { Building2, CreditCard, Euro, Sparkles } from "lucide-react";
 import { SearchForm } from "@/components/search-form";
 import { Card, EmptyState, PageHeader, Pill } from "@/components/ui";
@@ -11,6 +12,8 @@ export const metadata: Metadata = { title: "Console GarageFlow", robots: { index
 export const dynamic = "force-dynamic";
 
 export default async function AdminPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+  // Vérification dans la page elle-même : celle du layout n'empêche pas le rendu de la page.
+  await requirePlatformAdmin();
   const { q } = await searchParams;
   const [stats, garages] = await Promise.all([platformStats(), listGarages(q ?? "")]);
   const eur = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });

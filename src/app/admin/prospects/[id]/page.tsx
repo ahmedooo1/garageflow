@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { requirePlatformAdmin } from "@/server/context";
 import { notFound } from "next/navigation";
 import { Alert, Card, KV, PageHeader, Pill } from "@/components/ui";
 import { formatDate, formatDateTime } from "@/lib/format";
@@ -25,6 +26,7 @@ function SourceLink({ href, children }: { href: string; children: React.ReactNod
 }
 
 export default async function ProspectPage({ params }: { params: Promise<{ id: string }> }) {
+  await requirePlatformAdmin();
   const { id } = await params;
   let lead: Awaited<ReturnType<typeof getLead>>;
   try {
