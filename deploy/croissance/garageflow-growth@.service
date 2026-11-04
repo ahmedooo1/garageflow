@@ -1,0 +1,26 @@
+[Unit]
+Description=GarageFlow prospection : tâche %i
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=garageflow-growth
+Group=garageflow-growth
+ExecStart=/usr/local/bin/garageflow-growth %i
+TimeoutStartSec=20min
+# Le service ne fait qu'un appel HTTP local : aucun droit au-delà.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictNamespaces=yes
+RestrictRealtime=yes
+LockPersonality=yes
+CapabilityBoundingSet=
+SystemCallArchitectures=native

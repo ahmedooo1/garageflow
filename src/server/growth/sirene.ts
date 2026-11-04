@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { normalizePostalCode, normalizeSiret } from "@/lib/growth/normalize";
+import { LARGE_NETWORK_ESTABLISHMENTS, matchedNetwork, matchedNonRepair } from "@/lib/growth/scoring";
 import { TARGET_NAF, ZONES, type ZoneKey } from "@/lib/growth/zones";
 import { getAppUrl } from "@/server/lib/request";
 
@@ -111,9 +112,13 @@ export type SkipReasons = {
   horsZone: number;
   siretInvalide: number;
   sansNom: number;
+  /** Lavage, nettoyage, vitrage : classés en 45.20A sans être des ateliers. */
+  horsCible: number;
+  /** Réseau national nommé, ou plus de LARGE_NETWORK_ESTABLISHMENTS établissements. */
+  reseau: number;
 };
 
-const emptyReasons = (): SkipReasons => ({ diffusionRestreinte: 0, ferme: 0, horsActivite: 0, horsZone: 0, siretInvalide: 0, sansNom: 0 });
+const emptyReasons = (): SkipReasons => ({ diffusionRestreinte: 0, ferme: 0, horsActivite: 0, horsZone: 0, siretInvalide: 0, sansNom: 0, horsCible: 0, reseau: 0 });
 
 /** Champs dont dépend le connecteur : leur absence signale un changement de format de l'API. */
 const EXPECTED_UNITE = ["siren", "nom_complet", "matching_etablissements", "nombre_etablissements_ouverts", "tranche_effectif_salarie", "date_creation"] as const;
@@ -159,6 +164,15 @@ export function mapSireneResults(
         const name = titleCase((enseigne || unite.nom_complet || unite.nom_raison_sociale || "").trim());
         if (!name) {
           reasons.sansNom++;
+          continue;
+        }
+        // Non enregistrés du tout (minimisation) : ils ne seraient jamais contactés.
+        if (matchedNonRepair(name) || matchedNonRepair(unite.nom_complet ?? "")) {
+          reasons.horsCible++;
+          continue;
+        }
+        if (matchedNetwork(name) || matchedNetwork(unite.nom_complet ?? "") || (unite.nombre_etablissements_ouverts ?? 0) > LARGE_NETWORK_ESTABLISHMENTS) {
+          reasons.reseau++;
           continue;
         }
         candidates.push({

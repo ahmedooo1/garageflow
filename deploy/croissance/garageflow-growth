@@ -1,0 +1,21 @@
+#!/bin/sh
+# Déclenche une tâche de prospection dans le conteneur GarageFlow, sur le port
+# local du script de déploiement (127.0.0.1:3031), sans passer par Internet.
+#
+#   garageflow-growth <discovery|enrich|score|drafts|weekly-report> [--dry-run]
+#
+# Le secret n'apparaît ni dans la ligne de commande (visible par `ps`) ni dans
+# le journal : curl lit l'en-tête dans un fichier lisible du seul compte de
+# service. La réponse (compteurs de la tâche) va dans le journal systemd.
+# Aucune tâche n'envoie de message à un prospect : l'envoi exige toujours une
+# approbation humaine dans la console.
+set -eu
+HEADER=/etc/garageflow-growth/auth.header
+case "${1:-}" in
+  discovery | enrich | score | drafts | weekly-report) ;;
+  *) echo "usage : garageflow-growth <discovery|enrich|score|drafts|weekly-report> [--dry-run]" >&2; exit 2 ;;
+esac
+q="job=$1"
+[ "${2:-}" = "--dry-run" ] && q="$q&dryRun=1"
+[ -r "$HEADER" ] || { echo "En-tête d'authentification illisible : $HEADER" >&2; exit 3; }
+exec curl -sS --fail-with-body --max-time 900 -X POST -H "@$HEADER" "http://127.0.0.1:3031/api/growth/cron?$q"

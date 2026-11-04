@@ -78,6 +78,20 @@ export function matchedNetwork(name: string): string | null {
   return null;
 }
 
+/**
+ * Activités classées en 45.20A par l'INSEE sans être de la réparation :
+ * lavage, nettoyage, vitrage. Relevé sur l'API réelle (novembre 2026) : la
+ * moitié des premiers résultats de chaque zone étaient de ce type.
+ */
+const NON_REPAIR = /\b(lavage|nettoyage|pare brise|vitrage|glass|detailing|elephant bleu)\b|wash|clean/;
+
+export function matchedNonRepair(name: string): string | null {
+  return normalizeName(name).match(NON_REPAIR)?.[0] ?? null;
+}
+
+/** Au-delà, l'entreprise est une chaîne : logiciel imposé par le siège, pas un garage indépendant. */
+export const LARGE_NETWORK_ESTABLISHMENTS = 10;
+
 const YEAR_MS = 365.25 * 24 * 60 * 60 * 1000;
 
 export function scoreLead(input: ScoringInput, now = new Date()): ScoreResult {
@@ -104,9 +118,16 @@ export function scoreLead(input: ScoringInput, now = new Date()): ScoreResult {
 
   // Indépendance
   const network = matchedNetwork(input.name);
-  if (network) {
+  const nonRepair = matchedNonRepair(input.name);
+  if (nonRepair) {
+    disqualified = true;
+    add({ key: "activity", label: "Activité hors réparation", points: -40, evidence: `Le nom contient « ${nonRepair} » : lavage, nettoyage ou vitrage plutôt qu'un atelier de réparation` });
+  } else if (network) {
     disqualified = true;
     add({ key: "network", label: "Réseau national probable", points: -40, evidence: `Le nom contient « ${network} » : atelier probablement équipé par son réseau` });
+  } else if (input.establishmentsCount !== null && input.establishmentsCount > LARGE_NETWORK_ESTABLISHMENTS) {
+    disqualified = true;
+    add({ key: "network", label: "Chaîne", points: -40, evidence: `${input.establishmentsCount} établissements ouverts pour cette entreprise` });
   } else if (input.establishmentsCount !== null && input.establishmentsCount > 5) {
     add({ key: "independent", label: "Plusieurs établissements", points: -15, evidence: `${input.establishmentsCount} établissements ouverts pour cette entreprise` });
   } else if (input.establishmentsCount !== null && input.establishmentsCount <= 2) {

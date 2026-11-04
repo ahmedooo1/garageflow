@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { dedupeKey, normalizeEmail, normalizeName, normalizeUrl, sanitizeSource } from "@/lib/growth/normalize";
-import { matchedNetwork, QUALIFY_THRESHOLD, scoreLead, type ScoringInput } from "@/lib/growth/scoring";
+import { matchedNetwork, matchedNonRepair, QUALIFY_THRESHOLD, scoreLead, type ScoringInput } from "@/lib/growth/scoring";
 import { zoneForPostalCode } from "@/lib/growth/zones";
 import { costMicroUsd, validateAiDraft } from "@/server/growth/ai";
 import { classifySource, isBot } from "@/server/growth/audience";
@@ -100,6 +100,40 @@ describe("SIRENE", () => {
     expect(c.name).toBe("Garage Du Test");
     expect(c.sourceUrl).toBe("https://annuaire-entreprises.data.gouv.fr/etablissement/11111111100011");
     expect(JSON.stringify(c)).not.toMatch(/NE DOIT PAS/);
+  });
+});
+
+describe("SIRENE : cible, d'après les premiers résultats réels (novembre 2026)", () => {
+  // Noms relevés par l'essai à blanc sur l'API réelle, tous classés en 45.20A.
+  it("reconnaît le lavage, le nettoyage et le vitrage, sans écarter les ateliers", () => {
+    for (const n of ["Elite Car Wash", "Jeniclean", "Mondial Pare Brise", "Elite Pare-Brise", "Glass Express", "Lp Lavage", "Elephant Bleu", "Ws Lavage - Elephant Bleu"]) {
+      expect(matchedNonRepair(n), n).not.toBeNull();
+    }
+    for (const n of ["Garage Cantrel", "Faria", "Carrosserie Du Lavoir", "Garage Leclerc", "Mecanique Glassier", "Synapse"]) {
+      expect(matchedNonRepair(n), n).toBeNull();
+    }
+  });
+
+  it("n'enregistre ni le lavage ni les chaînes, et compte chaque exclusion", () => {
+    const etab = (siret: string) => ({ siret, adresse: "1 RUE X 76500 ELBEUF", code_postal: "76500", libelle_commune: "ELBEUF", activite_principale: "45.20A", etat_administratif: "A" });
+    const page = {
+      results: [
+        { siren: "799475116", nom_complet: "ELITE CAR WASH", statut_diffusion: "O", nombre_etablissements_ouverts: 31, matching_etablissements: [etab("79947511600015")] },
+        { siren: "352367239", nom_complet: "EXPRESS OIL", statut_diffusion: "O", nombre_etablissements_ouverts: 52, matching_etablissements: [etab("35236723900089")] },
+        { siren: "111111112", nom_complet: "SPEEDY FRANCE", statut_diffusion: "O", nombre_etablissements_ouverts: 1, matching_etablissements: [etab("11111111200011")] },
+        { siren: "341409613", nom_complet: "GARAGE CANTREL", statut_diffusion: "O", nombre_etablissements_ouverts: 2, matching_etablissements: [etab("34140961300039")] },
+      ],
+      total_pages: 1,
+    };
+    const r = mapSireneResults(page, "elbeuf", new Date());
+    expect(r.candidates.map((c) => c.name)).toEqual(["Garage Cantrel"]);
+    expect(r.reasons).toMatchObject({ horsCible: 1, reseau: 2 });
+  });
+
+  it("disqualifie aussi à la qualification (import CSV, saisie manuelle)", () => {
+    expect(scoreLead(input({ name: "Elite Car Wash" })).disqualified).toBe(true);
+    expect(scoreLead(input({ name: "Express Oil", establishmentsCount: 52 })).disqualified).toBe(true);
+    expect(scoreLead(input({ name: "Garage Faria", establishmentsCount: 3 })).disqualified).toBe(false);
   });
 });
 

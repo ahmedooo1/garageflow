@@ -1,6 +1,7 @@
 # GarageFlow : liste de lancement du moteur de prospection
 
-Branche `claude/remote-control-bkgpep`, état au 3 novembre 2026. Rien n'a été fusionné, déployé ni envoyé.
+Branche `claude/remote-control-bkgpep`, état au 4 novembre 2026. Seul le correctif de sécurité `/admin` est en production (`0fa7a7e`).
+La prospection n'a été ni fusionnée, ni déployée, et aucun message n'a été envoyé.
 
 **Légende**
 - **PASS** : vérifié par une exécution réelle, décrite dans la colonne « Preuve ».
@@ -8,25 +9,27 @@ Branche `claude/remote-control-bkgpep`, état au 3 novembre 2026. Rien n'a été
 - **UNVERIFIED** : impossible à vérifier depuis l'environnement de développement (réseau, accès serveur, avis juridique). C'est une hypothèse,
   avec la commande ou la question qui permet de trancher.
 
-Le proxy réseau du développement refuse `recherche-entreprises.api.gouv.fr`, `annuaire-entreprises.data.gouv.fr` et `garageflow.aaweb.fr`
-(refus 403 de la politique réseau). Rien n'a donc été observé sur le site en production ni sur l'API SIRENE réelle.
+Le poste de développement n'accède ni à `garageflow.aaweb.fr` ni à l'API SIRENE (refus de la politique réseau). Ces deux contrôles passent
+donc par des runners GitHub, en lecture seule et sans secret : workflows « Vérification des accès (production) » et « Validation SIRENE ».
 
-## 0. À faire en premier : fuite de données sur /admin, en production aujourd'hui
+## 0. Fuite de données sur /admin : corrigée en production
 
-| Élément | Statut | Preuve et action |
+| Élément | Statut | Preuve |
 | --- | --- | --- |
-| `/admin` sur `master` (en production) | **FAIL** | Le contrôle du rôle n'est fait que dans le layout ; Next rend la page en parallèle et le **corps de la redirection 307 contient la page entière**. Reproduit en local sur un build de `master` (`e2dcf1f`) : sans être connecté (`curl …/admin`, réponse 307), le corps contient le revenu mensuel et l'email du gérant ; avec n'importe quel compte garage, la liste des garages inscrits (gérants, emails, téléphones). Créer un compte est libre : c'est donc public. |
-| Correctif | **PASS** | Commit `5d48d25` : `requirePlatformAdmin()` dans chaque page `/admin`, et `/admin` sans cookie redirigé par le proxy avant tout rendu. Vérifié : test E2E qui lit le corps brut de la redirection (anonyme et compte garage), qui échoue sans le correctif et passe avec. |
-| Correctif applicable seul à `master` | **PASS** | Les deux fichiers `src/proxy.ts` et `src/app/admin/page.tsx` ont été appliqués à `master` (`e2dcf1f`) dans une copie de travail : typecheck, lint et build OK, plus aucune fuite (anonyme ou compte garage). Commandes en section 9.1. |
-
-Ce correctif devrait partir avant le reste, indépendamment de la prospection.
+| Faille sur l'ancien `master` (`e2dcf1f`) | Corrigée | Le corps de la redirection 307 et la charge RSC de `/admin` contenaient la page entière (revenu mensuel, garages, emails). |
+| Correctif en production | **PASS** | PR [ahmedooo1/garageflow#1](https://github.com/ahmedooo1/garageflow/pull/1), commit `0fa7a7e`, déployé le 4 novembre à 01:42 UTC (run 41754677511) : CI et E2E verts, image attestée, sauvegarde `avant-0fa7a7e….dump`, « succès » journalisé par le VPS, `/` et `/login` à 200. |
+| Bilan de santé sur le nouveau conteneur | **PASS** | `deploy/garageflow-deploy.sh` recrée le conteneur avec le nouveau tag, puis attend `/` et `/login` sur `127.0.0.1:3031`. La connexion refusée à 01:42:50, suivie du succès à 01:42:53, correspond au démarrage du nouveau conteneur. Limite : le script ne compare pas la version servie au SHA attendu. La preuve vient de la ligne suivante. |
+| Visiteur anonyme, site en ligne | **PASS** | Run 41759869138 : **24/24** contrôles (`/admin`, `/admin?q=`, 9 pages `/app`, en document et en RSC, sans suivre les redirections ; `/api/export` 401, `/api/upload` 403, `/api/files` 403, webhook Stripe 400). Sur l'ancien code, le même script relevait 8 fuites : c'est donc bien le correctif qui est servi. |
+| Compte garage sans rôle plateforme, site en ligne | **UNVERIFIED** | Aucun compte de test. Couvert en CI (E2E et intégration, y compris l'accès d'un garage aux données d'un autre). Pour le vérifier en ligne : créer un compte garage de test, puis mettre `GF_TEST_GARAGE_EMAIL` et `GF_TEST_GARAGE_PASSWORD` dans l'environnement GitHub `verification-acces` et relancer le workflow. |
+| Administrateur plateforme, `/admin` utilisable | **UNVERIFIED** | Même procédure avec `GF_ADMIN_EMAIL` et `GF_ADMIN_PASSWORD`, ou vérification manuelle dans le navigateur. Le workflow masque le cookie, ne l'écrit que dans un fichier du runner et ferme la session à la fin (vérifié en local : aucune session de connexion restante). |
+| Couche de données de la prospection | **PASS** | Même règle étendue (`e253851`) : lecture des fiches, brouillons, exclusions et exécutions, et chaque modification depuis la console, exigent un administrateur actif relu en base. Le test échoue si le contrôle est retiré. |
 
 ## 1. Qualité et tests
 
 | Élément | Statut | Preuve |
 | --- | --- | --- |
-| Tests unitaires et d'intégration (base PostgreSQL réelle) | **PASS** | `pnpm test` : **16 fichiers, 134 tests passés, 0 échec** (60 tests préexistants inclus). |
-| Tests de bout en bout (Playwright, build de production) | **PASS** | `pnpm build && pnpm start`, puis `pnpm exec playwright test` : **14/14 passés**. |
+| Tests unitaires et d'intégration (base PostgreSQL réelle) | **PASS** | `pnpm test` : **18 fichiers, 152 tests passés, 0 échec**, après fusion du correctif de sécurité. |
+| Tests de bout en bout (Playwright) | **PASS** | `pnpm exec playwright test` : **19/19 passés** (dont les 5 tests d'accès du correctif). |
 | Lint, typecheck, build | **PASS** | `pnpm lint`, `pnpm typecheck` et `pnpm build` sans erreur. |
 | Défauts trouvés par la revue, corrigés et couverts par un test | **PASS** | Fuite `/admin` ; DNS rebinding ; groupes robots.txt mal lus ; désinscription limitée à l'adresse courante ; doublons entre sources ; client résilié remis « en essai » ; abonnement Stripe `incomplete` qui bloquait l'essai ; prix codés en dur. Chaque test a échoué avant correction, ou couvre un cas qui n'était pas testé. |
 
@@ -49,6 +52,7 @@ Ce correctif devrait partir avant le reste, indépendamment de la prospection.
 | Export CSV des prospects | **PASS** | E2E : 403 pour un compte garage. Cellules protégées contre l'injection de formules ; chaque export est journalisé. |
 | Isolation des garages (existant) | **PASS** | `tenant-isolation.test.ts` et E2E « un garage ne voit pas les dossiers d'un autre » passent. Les tables de prospection n'ont aucun lien vers les données métier des garages. |
 | Déclencheur `/api/growth/cron` | **PASS** | `growth-cron.test.ts` : 404 sans secret ou avec un secret de moins de 32 caractères ; 401 si le jeton est absent ou faux, sans rien exécuter ; 400 pour une tâche inconnue ; une seule exécution par période. |
+| Prospection autonome sans envoi | **PASS** | `growth-autonomy.test.ts` : les cinq tâches, chaque jour pendant 14 jours simulés, **avec l'envoi activé** (`OUTREACH_SEND_ENABLED=true`). Des brouillons sont prêts à relire et le rapport interne part, mais aucun message n'est approuvé ni envoyé à un prospect. Seule l'action « Envoyer » de la console, sur un brouillon approuvé par un administrateur, envoie. |
 | SSRF lors de la vérification des sites | **PASS** (pile locale) | `website-connector.test.ts`, sur de vraies sockets : `localhost` refusé ; nom public qui se résout en adresse interne **au moment de la connexion** refusé ; redirection vers une IP interne refusée ; ports non standards et identifiants dans l'URL refusés ; certificat TLS auto-signé refusé. |
 | SSRF sur l'Internet réel | **UNVERIFIED** | Aucun accès réseau depuis le développement. Le code est le même ; à observer lors du premier essai réel (section 9.4). |
 | Injection de consignes depuis un site web | **PASS** | Par construction : le texte d'un site n'est ni stocké ni transmis au modèle. Seuls des booléens et des adresses `mailto:` ou `tel:` en sont extraits (test : une consigne cachée dans la page n'a aucun effet). |
@@ -61,20 +65,12 @@ Ce correctif devrait partir avant le reste, indépendamment de la prospection.
 
 | Élément | Statut | Preuve |
 | --- | --- | --- |
-| Réponse réelle de l'API | **UNVERIFIED** | Accès refusé par la politique réseau, aussi bien par le proxy que par le service de récupération web. |
-| Lecture du format documenté | **PASS** | Tests sur réponses au format documenté : établissements actifs dans la zone seulement, exclusion des diffusions restreintes et des valeurs « [NON-DIFFUSIBLE] », dirigeants jamais lus. |
-| Détection d'un changement de format | **PASS** | Un champ attendu absent (`matching_etablissements`, `siret`, `code_postal`…) apparaît dans `missingFields`, et la découverte n'importe rien à l'aveugle. Une réponse sans `results` fait échouer la tâche, visiblement. |
-| Essai à blanc sans risque | **PASS** (outil prêt) | `pnpm exec tsx scripts/sirene-dry-run.ts --raw elbeuf 1`, depuis n'importe quel poste connecté : ni base, ni écriture, codes de sortie 1 en cas de dérive. Dans la console, « Simuler » la découverte n'écrit que la ligne d'exécution, avec un échantillon. |
-
-Hypothèses à confirmer lors du premier essai à blanc :
-
-1. `code_postal` accepte plusieurs valeurs séparées par des virgules. Si elle est ignorée, le filtre par zone du code protège l'import, et
-   `skipReasons.horsZone` sera élevé.
-2. `activite_principale=45.20A` (avec le point) et `etat_administratif=A` sont acceptés.
-3. Les champs `matching_etablissements[].siret`, `code_postal`, `activite_principale`, `etat_administratif`, `liste_enseignes` et
-   `tranche_effectif_salarie` existent.
-4. `per_page=25` est accepté. La limite de 7 requêtes par seconde est respectée (une requête toutes les 400 ms).
-5. Le volume attendu : quelques dizaines d'établissements actifs en 45.20A par zone, plafonnés à 100 par zone et par exécution.
+| Réponse réelle de l'API | **PASS** | Workflow « Validation SIRENE », run 41761169576 (4 novembre) : statut 200, `missingFields: []` dans les quatre zones. |
+| Hypothèses de format | **PASS** | Plusieurs codes postaux séparés par des virgules acceptés (`horsZone: 0` partout) ; `activite_principale=45.20A` et `etat_administratif=A` acceptés ; `per_page=25` accepté ; tous les champs lus présents (`siret`, `code_postal`, `activite_principale`, `etat_administratif`, `liste_enseignes`, `tranche_effectif_salarie`…). |
+| Volume | **PASS** | Établissements 45.20A actifs : Elbeuf 109, Rouen 128, métropole de Rouen 260, Le Havre 184. Une page de 25 entreprises donne 15 à 23 établissements retenus. La découverte reste plafonnée à 100 fiches par zone et par exécution. |
+| Pertinence de la cible | **PASS** (corrigé) | Constat sur les vraies réponses : le code 45.20A regroupe aussi le lavage (Elephant Bleu, car wash), le nettoyage, le vitrage (pare-brise) et des chaînes de 12 à 52 établissements. C'était la majorité des échantillons. Ces entreprises ne sont plus enregistrées du tout (motifs `horsCible` et `reseau`), et sont disqualifiées si elles arrivent par import ou saisie. Test sur les noms réellement relevés. |
+| Détection d'un changement de format | **PASS** | Un champ attendu absent apparaît dans `missingFields`, et la découverte n'importe rien à l'aveugle. Le workflow échoue dans ce cas : à relancer avant d'activer la planification, puis après tout changement du connecteur (il se relance seul à chaque modification de ces fichiers). |
+| Essai sans écriture | **PASS** | `pnpm exec tsx scripts/sirene-dry-run.ts --raw elbeuf 1` : ni base, ni écriture. |
 
 ## 5. Connecteur « site web »
 
@@ -121,6 +117,35 @@ Ce qui est en place a été testé. Ce qui relève d'une décision juridique est
 | TVA dans Stripe Checkout | **UNVERIFIED** (décision) | Le code ne configure aucune taxe (`automatic_tax` ou taux de TVA). Le client paie exactement le montant du prix Stripe. Si le prix Stripe vaut 59,00 € et que vous facturez la TVA, vous encaissez 59 € TTC, soit 49,17 € HT, alors que le site annonce « 59 € HT ». À décider : prix TTC de 70,80 €, taux de TVA 20 % en mode exclusif, ou franchise en base (« TVA non applicable, art. 293 B du CGI » sur la facture). |
 | Mention « à l'atelier » | **UNVERIFIED** | L'accueil et les modèles proposent une démo « en visio ou à l'atelier ». À retirer si vous ne vous déplacez pas. |
 
+### 7.1 Variables d'environnement du service `app`
+
+Liste exhaustive des variables lues par la prospection (relevée dans le code). Les autres variables de l'application ne changent pas.
+
+| Variable | Obligatoire | Valeur ou règle | Effet si absente |
+| --- | --- | --- | --- |
+| `APP_URL` | Oui | `https://garageflow.aaweb.fr` | Liens de désinscription faux ; l'approbation est refusée hors https. |
+| `GROWTH_CRON_SECRET` | Pour la planification | 64 caractères hexadécimaux (`openssl rand -hex 32`) | `/api/growth/cron` répond 404 : aucune tâche planifiée ne tourne. |
+| `GROWTH_DISCOVERY_ZONES` | Non | `elbeuf,rouen,rouen-metropole,le-havre` | Toutes les zones connues. Commencer par `elbeuf`. |
+| `GROWTH_REPORT_TO` | Recommandé | Votre adresse | Pas de rapport hebdomadaire ni d'alerte de demande de démo. |
+| `OUTREACH_SENDER_NAME`, `OUTREACH_SENDER_COMPANY`, `OUTREACH_SENDER_ADDRESS` | Oui, avant toute approbation | Vos données réelles (mentions obligatoires) | L'approbation d'un brouillon est bloquée. |
+| `OUTREACH_SENDER_SIREN` | Non | SIREN de l'éditeur | Absent du pied de message. |
+| `OUTREACH_REPLY_TO` | Pour l'envoi depuis GarageFlow | Adresse qui lit les réponses | Envoi SMTP refusé. |
+| `OUTREACH_SEND_ENABLED` | Non | `false` au lancement | Valeur `true` : le bouton « Envoyer » devient actif, toujours après approbation humaine. Sinon, envoi depuis votre messagerie puis « Marquer comme envoyé ». |
+| `OUTREACH_FROM` | Si `OUTREACH_SEND_ENABLED=true` | `Prénom <adresse@domaine>` | Repli sur `MAIL_FROM`. |
+| `MAIL_TRANSPORT`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `MAIL_FROM` | Pour le rapport et l'envoi | `smtp` en production | Avec `log`, aucun email ne part, y compris les emails transactionnels existants. |
+| `ANTHROPIC_API_KEY` | Non | Plus tard | Rédaction par modèle de message, sans appel externe. |
+| `GROWTH_AI_MODEL` | Non | Vide (modèle par défaut du code) | Modèle par défaut. |
+| `GROWTH_KILL_SWITCH` | Non | `1` pour tout arrêter | Arrêt d'urgence indépendant de la base : chaque tâche est enregistrée « ignorée ». |
+
+Contrôle sans rien afficher, sur le VPS :
+
+```sh
+cd /var/www/garageflow
+for v in APP_URL GROWTH_CRON_SECRET GROWTH_REPORT_TO OUTREACH_SENDER_NAME OUTREACH_SENDER_COMPANY OUTREACH_SENDER_ADDRESS MAIL_TRANSPORT; do
+  docker compose exec -T app sh -c "[ -n \"\${$v:-}\" ]" && echo "$v définie" || echo "$v ABSENTE"; done
+docker compose exec -T app printenv APP_URL MAIL_TRANSPORT GROWTH_DISCOVERY_ZONES OUTREACH_SEND_ENABLED   # valeurs non secrètes
+```
+
 ## 8. Parcours commercial complet
 
 | Étape | Statut | Preuve |
@@ -137,25 +162,11 @@ Ce qui est en place a été testé. Ce qui relève d'une décision juridique est
 
 ## 9. Procédures
 
-### 9.1 Correctif de sécurité seul, vers `master` (recommandé en premier)
+### 9.1 Correctif de sécurité seul, vers `master`
 
-```sh
-git fetch origin
-git switch -c hotfix/admin-rbac origin/master
-git checkout origin/claude/remote-control-bkgpep -- src/proxy.ts src/app/admin/page.tsx
-pnpm install --frozen-lockfile
-pnpm lint && pnpm typecheck && pnpm test && pnpm build
-git commit -am "Sécurité : rôle plateforme vérifié dans la page /admin"
-git push -u origin hotfix/admin-rbac
-# Ouvrir une pull request vers master, la relire, fusionner : le workflow Déploiement s'exécute.
-```
-
-Vérification après déploiement :
-
-```sh
-curl -s -o /tmp/admin.html -w "%{http_code}\n" https://garageflow.aaweb.fr/admin   # 307
-grep -c "Revenu mensuel" /tmp/admin.html                                              # 0
-```
+Fait : PR [ahmedooo1/garageflow#1](https://github.com/ahmedooo1/garageflow/pull/1), en production depuis le 4 novembre (section 0).
+Contrôle à tout moment : workflow « Vérification des accès (production) », lancé depuis l'onglet Actions (bouton « Run workflow » une fois le
+fichier sur `master`, ou à chaque modification du fichier sur cette branche).
 
 ### 9.2 Avant la fusion de la branche de prospection
 
@@ -177,7 +188,8 @@ Puis ajouter au service `app` (dans `environment:` si le fichier liste les varia
 - `OUTREACH_SENDER_NAME`, `OUTREACH_SENDER_COMPANY`, `OUTREACH_SENDER_ADDRESS` (vos données réelles), et `OUTREACH_SENDER_SIREN` si vous le
   souhaitez ;
 - `OUTREACH_REPLY_TO`, `GROWTH_REPORT_TO` ;
-- `GROWTH_CRON_SECRET` (`openssl rand -hex 32`, à recopier dans `/etc/garageflow-growth.secret`, en `chmod 600`) ;
+- `GROWTH_CRON_SECRET` (`umask 077; printf 'GROWTH_CRON_SECRET=%s\n' "$(openssl rand -hex 32)" >> .env`, jamais affiché ; le script
+  d'installation de la section 9.5 le reprend de là) ;
 - plus tard seulement : `ANTHROPIC_API_KEY`, `OUTREACH_SEND_ENABLED=true` et `OUTREACH_FROM`.
 
 Compléter aussi les mentions légales (raison sociale, adresse, hébergeur) dans `src/app/(marketing)/cgu/page.tsx` et la politique de
@@ -216,37 +228,57 @@ Puis, dans le navigateur, avec votre compte plateforme :
    sur `GROWTH_REPORT_TO`.
 3. Ouvrir `/desinscription/<jeton>` depuis un brouillon de test : la page s'affiche sans rien modifier.
 
-### 9.4 Premier essai de prospection, sans envoi
+### 9.4 Essai à blanc en production, puis premier essai réel, sans envoi
 
-1. Depuis un poste connecté, dans une copie du dépôt : `pnpm exec tsx scripts/sirene-dry-run.ts --raw elbeuf 1`. Attendu : statut 200,
-   `missingFields: []`, et des SIRET qui s'ouvrent sur annuaire-entreprises.data.gouv.fr. En cas de champ manquant, **s'arrêter** et me
-   transmettre la sortie.
-2. Console, « Découverte SIRENE » puis « Simuler » : mêmes vérifications sur l'échantillon.
-3. « Exécuter », puis ouvrir trois fiches et comparer chaque fait à la fiche annuaire.
-4. Renseigner le site de cinq garages, puis « Vérifier le site maintenant » : contrôler les signaux et l'email relevé.
-5. « Préparation des brouillons », puis relire. N'envoyer qu'après validation des mentions légales (section 6).
-
-### 9.5 Planification
+Après le déploiement de la prospection (accord explicite requis), sur le VPS :
 
 ```sh
-# /usr/local/bin/garageflow-growth (chmod 700)
-#!/bin/sh
-set -eu
-curl -fsS --max-time 600 -X POST -H "Authorization: Bearer $(cat /etc/garageflow-growth.secret)" \
-  "http://127.0.0.1:3031/api/growth/cron?job=$1"
+cd /chemin/vers/une/copie/du/depot && git pull
+sudo sh deploy/croissance/installer.sh          # installe et vérifie, sans rien planifier
+sudo -u garageflow-growth garageflow-growth discovery --dry-run | head -c 4000
 ```
 
-```cron
-# Heures UTC. Appel direct du conteneur (port 3031, celui du script de déploiement) : pas de délai du proxy web.
-17 5 * * 1   /usr/local/bin/garageflow-growth discovery
-37 5 * * *   /usr/local/bin/garageflow-growth enrich
-47 5 * * *   /usr/local/bin/garageflow-growth score
-57 5 * * *   /usr/local/bin/garageflow-growth drafts
-13 7 * * 1   /usr/local/bin/garageflow-growth weekly-report
+Attendu pour chaque zone de `GROWTH_DISCOVERY_ZONES` : `missingFields: []`, des `horsCible` et `reseau` non nuls, et un échantillon de vrais
+garages, sans lavage ni chaîne. La simulation n'écrit qu'une ligne d'exécution. Puis :
+
+1. Console, `/admin/croissance` : la simulation apparaît dans « Exécutions récentes ».
+2. Découverte réelle, une seule zone (`GROWTH_DISCOVERY_ZONES=elbeuf`) : `sudo -u garageflow-growth garageflow-growth discovery`. Ouvrir
+   trois fiches et comparer chaque fait à la fiche annuaire.
+3. Renseigner le site de cinq garages, puis « Vérifier le site maintenant » : contrôler les signaux et l'email relevé.
+4. `sudo -u garageflow-growth garageflow-growth score`, puis `drafts`, et relire les brouillons. N'approuver qu'après validation des mentions
+   légales (section 6).
+
+### 9.5 Fonctionnement continu (systemd)
+
+Fichiers dans `deploy/croissance/` : le script `garageflow-growth`, l'unité `garageflow-growth@.service` et cinq minuteries.
+
+| Tâche | Quand (UTC) | Effet |
+| --- | --- | --- |
+| `discovery` | lundi 05:17 | Nouvelles fiches SIRENE, 100 par zone au plus |
+| `enrich` | chaque jour 05:37 | Vérification des sites renseignés |
+| `score` | chaque jour 05:47 | Requalification |
+| `drafts` | chaque jour 05:57 | Brouillons à relire, **aucun envoi** |
+| `weekly-report` | lundi 07:13 | Rapport interne vers `GROWTH_REPORT_TO` |
+
+```sh
+sudo sh deploy/croissance/installer.sh --activer     # après l'essai de la section 9.4
+systemctl list-timers 'garageflow-growth-*'
+journalctl -u 'garageflow-growth@*' --since today     # compteurs de chaque exécution
+sudo sh deploy/croissance/installer.sh --desactiver  # arrêt de la planification
 ```
 
-À activer seulement après l'essai de la section 9.4. Arrêt d'urgence : case de la console, ou `GROWTH_KILL_SWITCH=1` puis
-`docker compose up -d --no-deps app`.
+Garanties :
+
+- Une exécution manquée (serveur éteint) est rattrapée au redémarrage (`Persistent=true`). Rejouer une tâche dans la même période renvoie
+  l'exécution existante. Une exécution bloquée plus de 30 minutes est reprise, trois tentatives au plus.
+- Le service tourne sous un compte sans shell, système en lecture seule. Le secret est lu par curl dans un fichier `640` : il n'apparaît ni
+  dans `ps` ni dans le journal.
+- Un échec (réponse 401, 404 ou 500) marque l'unité en échec : `systemctl --failed`, et la console affiche l'exécution en échec.
+- Arrêt d'urgence : case de la console, ou `GROWTH_KILL_SWITCH=1` puis `docker compose up -d --no-deps app`.
+- Aucun envoi automatique : seul le bouton « Envoyer » d'un administrateur, sur un brouillon approuvé, envoie (test section 3).
+
+Non vérifié : l'installation elle-même sur le VPS (version de systemd, `runuser`, `docker compose exec`). Le script et les unités ont été
+contrôlés en local (syntaxe, calendrier, lecture du secret depuis un fichier, réponse 401 traitée comme un échec).
 
 ### 9.6 Retour arrière
 
@@ -264,7 +296,7 @@ curl -fsS --max-time 600 -X POST -H "Authorization: Bearer $(cat /etc/garageflow
 
 - **Base** : inutile pour cette version, car la migration est additive. Une restauration (`pg_restore --clean` depuis
   `backups/avant-<sha>.dump`) **efface les données écrites depuis** : à ne faire qu'en dernier recours, et après accord explicite.
-- Désactiver la prospection sans revenir en arrière : arrêt d'urgence (section 9.5) et retrait des lignes de crontab.
+- Désactiver la prospection sans revenir en arrière : arrêt d'urgence (section 9.5) et `sudo sh deploy/croissance/installer.sh --desactiver`.
 
 ### 9.7 Surveillance (sans nouveau service)
 
@@ -273,7 +305,7 @@ curl -fsS --max-time 600 -X POST -H "Authorization: Bearer $(cat /etc/garageflow
 | Déploiements, bascules et retours arrière | `/var/www/garageflow/deploy.log` |
 | Tâches en échec, compteurs, motifs d'exclusion SIRENE | `/admin/croissance`, « Exécutions récentes » ; table `GrowthJobRun` |
 | Erreurs applicatives | `docker compose logs --since 24h app \| grep -E "\[growth\]\|\[stripe\]\|\[mail\]\|\[action\]"` |
-| Échec d'une tâche planifiée | Code de sortie de `curl -f` : le cron envoie la sortie par email s'il est configuré pour le faire (`MAILTO`) |
+| Échec d'une tâche planifiée | `systemctl --failed`, `journalctl -u 'garageflow-growth@*'`, et l'exécution en échec dans la console |
 | Synthèse hebdomadaire | Rapport du lundi sur `GROWTH_REPORT_TO` |
 | Dépense de rédaction assistée | `/admin/croissance`, « Réglages » ; table `AiUsage` |
 
@@ -305,7 +337,7 @@ premiers clients.
 
 | Poste | Coût | Statut |
 | --- | --- | --- |
-| API SIRENE, vérification des sites, tâches planifiées (cron du VPS) | 0 € | **PASS** (aucun service ajouté) |
+| API SIRENE, vérification des sites, tâches planifiées (systemd du VPS) | 0 € | **PASS** (aucun service ajouté) |
 | Envoi depuis votre messagerie | 0 € | **PASS** (mode par défaut) |
 | Rédaction assistée | 0 € si désactivée ; sinon plafonnée par le budget de la console (10 $ par défaut) | **PASS** (plafond testé) ; coût réel **UNVERIFIED** (aucun appel réel) |
 | Stripe | Commission par paiement, aucun abonnement | Hors de ce dépôt |

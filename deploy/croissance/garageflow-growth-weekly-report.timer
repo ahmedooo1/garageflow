@@ -1,0 +1,12 @@
+[Unit]
+Description=GarageFlow prospection : rapport hebdomadaire interne
+
+[Timer]
+OnCalendar=Mon *-*-* 07:13:00 UTC
+# Rattrape une exécution manquée (serveur éteint) ; la tâche est idempotente par période.
+Persistent=true
+RandomizedDelaySec=3min
+Unit=garageflow-growth@weekly-report.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,12 @@
+[Unit]
+Description=GarageFlow prospection : découverte SIRENE
+
+[Timer]
+OnCalendar=Mon *-*-* 05:17:00 UTC
+# Rattrape une exécution manquée (serveur éteint) ; la tâche est idempotente par période.
+Persistent=true
+RandomizedDelaySec=3min
+Unit=garageflow-growth@discovery.service
+
+[Install]
+WantedBy=timers.target
