@@ -1,0 +1,45 @@
+name: Validation SIRENE (lecture seule)
+
+# Essai à blanc du connecteur SIRENE contre l'API publique réelle
+# (recherche-entreprises.api.gouv.fr), depuis un runner GitHub : aucune base,
+# aucune écriture, aucun secret. Échoue si un champ attendu manque
+# (changement de format de l'API) : ne pas lancer la découverte réelle tant
+# que ce contrôle n'est pas vert.
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/remote-control-bkgpep]
+    paths: [.github/workflows/validation-sirene.yml, scripts/sirene-dry-run.ts, src/server/growth/sirene.ts, src/lib/growth/zones.ts]
+
+permissions:
+  contents: read
+
+jobs:
+  sirene:
+    name: Essai à blanc par zone
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # Seulement pour l'agent identifié (User-Agent) envoyé à l'API.
+      APP_URL: https://garageflow.aaweb.fr
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Champs bruts de la réponse (noms seulement)
+        run: pnpm exec tsx scripts/sirene-dry-run.ts --raw elbeuf 1
+      - name: Toutes les zones, une page chacune
+        run: |
+          rc=0
+          for zone in elbeuf rouen rouen-metropole le-havre; do
+            echo "== $zone"
+            pnpm exec tsx scripts/sirene-dry-run.ts "$zone" 1 || rc=1
+            sleep 1
+          done
+          exit "$rc"
