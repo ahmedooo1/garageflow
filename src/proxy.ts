@@ -11,7 +11,8 @@ export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const hasCookie = Boolean(request.cookies.get(SESSION_COOKIE)?.value);
 
-  if (pathname.startsWith("/app") && !hasCookie) {
+  // /admin : sans cookie, rien n'est rendu. Le rôle plateforme est vérifié dans chaque page.
+  if ((pathname.startsWith("/app") || pathname === "/admin" || pathname.startsWith("/admin/")) && !hasCookie) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.search = pathname !== "/app" ? `?next=${encodeURIComponent(pathname)}` : "";

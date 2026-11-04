@@ -1,14 +1,23 @@
 import type { Plan } from "@prisma/client";
 import { evaluateAccess, PLANS, type AccessState } from "@/lib/plans";
 import { prisma } from "@/server/db";
-import { AppError, NotFoundError } from "@/server/lib/errors";
+import { AppError, ForbiddenError, NotFoundError } from "@/server/lib/errors";
 import { audit } from "./audit";
 
 /**
  * Console plateforme : vue d'exploitation pour l'équipe GarageFlow.
  * Volontairement limitée à des agrégats et à l'abonnement - aucun accès aux
  * données métier des garages (clients, véhicules, dossiers).
+ *
+ * Chaque fonction exige l'identifiant d'un administrateur plateforme actif et
+ * le vérifie en base : la protection ne dépend ni du layout, ni de la page,
+ * ni de l'action qui l'appelle.
  */
+
+export async function assertPlatformActor(actorId: string): Promise<void> {
+  const actor = actorId ? await prisma.user.findUnique({ where: { id: actorId }, select: { platformAdmin: true, active: true } }) : null;
+  if (!actor?.platformAdmin || !actor.active) throw new ForbiddenError("Accès réservé à l'équipe GarageFlow");
+}
 
 export type GarageRow = {
   id: string;
@@ -26,7 +35,8 @@ export type GarageRow = {
   lastActivityAt: Date | null;
 };
 
-export async function listGarages(query = ""): Promise<GarageRow[]> {
+export async function listGarages(actorId: string, query = ""): Promise<GarageRow[]> {
+  await assertPlatformActor(actorId);
   const q = query.trim();
   const garages = await prisma.garage.findMany({
     where: q
@@ -94,7 +104,8 @@ export type PlatformStats = {
   mrrHt: number;
 };
 
-export async function platformStats(): Promise<PlatformStats> {
+export async function platformStats(actorId: string): Promise<PlatformStats> {
+  await assertPlatformActor(actorId);
   const [garages, byStatus, workOrders, activePlans] = await Promise.all([
     prisma.garage.count(),
     prisma.garage.groupBy({ by: ["subscriptionStatus"], _count: true }),
@@ -120,6 +131,7 @@ async function requireGarage(garageId: string) {
 }
 
 export async function extendTrial(garageId: string, days: number, actorId: string): Promise<void> {
+  await assertPlatformActor(actorId);
   const value = Math.round(days);
   if (!Number.isFinite(value) || value < 1 || value > 90) throw new AppError("Durée invalide (1 à 90 jours)");
   const garage = await requireGarage(garageId);
@@ -130,6 +142,7 @@ export async function extendTrial(garageId: string, days: number, actorId: strin
 }
 
 export async function suspendGarage(garageId: string, reason: string, actorId: string): Promise<void> {
+  await assertPlatformActor(actorId);
   await requireGarage(garageId);
   const message = reason.trim().slice(0, 300);
   await prisma.garage.update({
@@ -140,6 +153,7 @@ export async function suspendGarage(garageId: string, reason: string, actorId: s
 }
 
 export async function unsuspendGarage(garageId: string, actorId: string): Promise<void> {
+  await assertPlatformActor(actorId);
   const garage = await prisma.garage.findUnique({ where: { id: garageId }, select: { currentPeriodEnd: true, trialEndsAt: true } });
   if (!garage) throw new NotFoundError("Garage introuvable");
   const stillPaid = garage.currentPeriodEnd !== null && garage.currentPeriodEnd.getTime() > Date.now();
@@ -152,6 +166,7 @@ export async function unsuspendGarage(garageId: string, actorId: string): Promis
 }
 
 export async function setPlatformAdmin(userId: string, value: boolean, actorId: string): Promise<void> {
+  await assertPlatformActor(actorId);
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, garageId: true } });
   if (!user) throw new NotFoundError("Utilisateur introuvable");
   if (userId === actorId && !value) throw new AppError("Vous ne pouvez pas retirer votre propre accès plateforme");

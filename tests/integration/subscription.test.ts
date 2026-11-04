@@ -20,6 +20,17 @@ async function garage(label: string): Promise<TestGarage> {
 
 const DAY = 24 * 60 * 60 * 1000;
 
+/** Administrateur plateforme dédié : les services de la console exigent un tel acteur. */
+let opsUserId: string | undefined;
+async function ops(): Promise<string> {
+  if (!opsUserId) {
+    const g = await garage("PlatformOps");
+    await prisma.user.update({ where: { id: g.owner.userId }, data: { platformAdmin: true } });
+    opsUserId = g.owner.userId;
+  }
+  return opsUserId;
+}
+
 describe("abonnement du garage", () => {
   it("démarre un essai de 14 jours à l'inscription", async () => {
     const g = await garage("Sub1");
@@ -40,7 +51,7 @@ describe("abonnement du garage", () => {
     expect(access.canWrite).toBe(false);
     expect(access.reason).toMatch(/essai gratuit est terminé/i);
 
-    await activateManually(g.garageId, { plan: "RESEAU", months: 3 }, g.owner.userId);
+    await activateManually(g.garageId, { plan: "RESEAU", months: 3 }, await ops());
     access = await getAccess(g.garageId);
     expect(access.canWrite).toBe(true);
     expect(access.plan).toBe("RESEAU");
@@ -53,13 +64,13 @@ describe("abonnement du garage", () => {
 
   it("une suspension bloque même un abonnement payé, la levée le rétablit", async () => {
     const g = await garage("Sub3");
-    await activateManually(g.garageId, { plan: "ATELIER", months: 12 }, g.owner.userId);
-    await suspendGarage(g.garageId, "Impayé récurrent", g.owner.userId);
+    await activateManually(g.garageId, { plan: "ATELIER", months: 12 }, await ops());
+    await suspendGarage(g.garageId, "Impayé récurrent", await ops());
     let access = await getAccess(g.garageId);
     expect(access.canWrite).toBe(false);
     expect(access.reason).toBe("Impayé récurrent");
 
-    await unsuspendGarage(g.garageId, g.owner.userId);
+    await unsuspendGarage(g.garageId, await ops());
     access = await getAccess(g.garageId);
     expect(access.canWrite).toBe(true);
     expect(access.status).toBe("ACTIVE");
@@ -68,13 +79,13 @@ describe("abonnement du garage", () => {
   it("prolonge l'essai depuis la console et refuse les durées aberrantes", async () => {
     const g = await garage("Sub4");
     await prisma.garage.update({ where: { id: g.garageId }, data: { trialEndsAt: new Date(Date.now() - 5 * DAY) } });
-    await extendTrial(g.garageId, 7, g.owner.userId);
+    await extendTrial(g.garageId, 7, await ops());
     const access = await getAccess(g.garageId);
     expect(access.canWrite).toBe(true);
     expect(access.trialDaysLeft).toBe(7);
-    await expect(extendTrial(g.garageId, 0, g.owner.userId)).rejects.toBeInstanceOf(AppError);
-    await expect(extendTrial(g.garageId, 500, g.owner.userId)).rejects.toBeInstanceOf(AppError);
-    await expect(extendTrial("garage-inexistant", 7, g.owner.userId)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(extendTrial(g.garageId, 0, await ops())).rejects.toBeInstanceOf(AppError);
+    await expect(extendTrial(g.garageId, 500, await ops())).rejects.toBeInstanceOf(AppError);
+    await expect(extendTrial("garage-inexistant", 7, await ops())).rejects.toBeInstanceOf(NotFoundError);
   });
 
   it("refuse de dépasser le nombre de comptes du plan", async () => {
@@ -100,7 +111,7 @@ describe("abonnement du garage", () => {
 
   it("un plan supérieur ouvre davantage de comptes", async () => {
     const g = await garage("SeatsPro");
-    await activateManually(g.garageId, { plan: "RESEAU", months: 1 }, g.owner.userId);
+    await activateManually(g.garageId, { plan: "RESEAU", months: 1 }, await ops());
     const usage = await getSeatUsage(g.garageId);
     expect(usage.limit).toBe(PLANS.RESEAU.seats);
     await expect(assertSeatAvailable(g.garageId)).resolves.toBeUndefined();
@@ -122,17 +133,19 @@ describe("console plateforme", () => {
   });
 
   it("l'octroi et le retrait du rôle plateforme sont tracés, sans auto-retrait", async () => {
-    await setPlatformAdmin(a.owner.userId, true, a.owner.userId);
+    // Un compte ordinaire ne peut pas s'accorder lui-même le rôle.
+    await expect(setPlatformAdmin(a.owner.userId, true, a.owner.userId)).rejects.toBeInstanceOf(ForbiddenError);
+    await setPlatformAdmin(a.owner.userId, true, await ops());
     expect((await prisma.user.findUnique({ where: { id: a.owner.userId } }))?.platformAdmin).toBe(true);
     await expect(setPlatformAdmin(a.owner.userId, false, a.owner.userId)).rejects.toBeInstanceOf(AppError);
-    await setPlatformAdmin(a.owner.userId, false, b.owner.userId);
+    await setPlatformAdmin(a.owner.userId, false, await ops());
     expect((await prisma.user.findUnique({ where: { id: a.owner.userId } }))?.platformAdmin).toBe(false);
     const log = await prisma.auditLog.findFirst({ where: { action: "platform.admin_revoked", entityId: a.owner.userId } });
     expect(log).not.toBeNull();
   });
 
   it("la liste plateforme n'expose que des agrégats, jamais les données métier", async () => {
-    const rows = await listGarages();
+    const rows = await listGarages(await ops());
     const row = rows.find((r) => r.id === a.garageId);
     expect(row).toBeDefined();
     expect(row!.counts).toEqual({ users: expect.any(Number), customers: expect.any(Number), vehicles: expect.any(Number), workOrders: expect.any(Number) });
@@ -143,17 +156,43 @@ describe("console plateforme", () => {
   });
 
   it("la recherche plateforme filtre par nom de garage", async () => {
-    const rows = await listGarages("PlatA");
+    const rows = await listGarages(await ops(), "PlatA");
     expect(rows.map((r) => r.id)).toContain(a.garageId);
     expect(rows.map((r) => r.id)).not.toContain(b.garageId);
   });
 
   it("les statistiques comptent les garages et le revenu des abonnés actifs", async () => {
-    await activateManually(b.garageId, { plan: "ATELIER", months: 1 }, b.owner.userId);
-    const stats = await platformStats();
+    await activateManually(b.garageId, { plan: "ATELIER", months: 1 }, await ops());
+    const stats = await platformStats(await ops());
     expect(stats.garages).toBeGreaterThanOrEqual(2);
     expect(stats.active).toBeGreaterThanOrEqual(1);
     expect(stats.mrrHt).toBeGreaterThanOrEqual(PLANS.ATELIER.priceHt);
+  });
+});
+
+describe("console plateforme : contrôle au niveau des données", () => {
+  it("chaque fonction refuse un acteur qui n'est pas administrateur plateforme", async () => {
+    const g = await garage("PlatDeny");
+    const other = await garage("PlatDenyB");
+    const actors = [g.owner.userId, g.technician.userId, "", "utilisateur-inexistant"];
+    for (const actor of actors) {
+      await expect(listGarages(actor)).rejects.toBeInstanceOf(ForbiddenError);
+      await expect(platformStats(actor)).rejects.toBeInstanceOf(ForbiddenError);
+      await expect(extendTrial(other.garageId, 7, actor)).rejects.toBeInstanceOf(ForbiddenError);
+      await expect(suspendGarage(other.garageId, "x", actor)).rejects.toBeInstanceOf(ForbiddenError);
+      await expect(unsuspendGarage(other.garageId, actor)).rejects.toBeInstanceOf(ForbiddenError);
+      await expect(activateManually(other.garageId, { plan: "RESEAU", months: 12 }, actor)).rejects.toBeInstanceOf(ForbiddenError);
+      await expect(setPlatformAdmin(g.owner.userId, true, actor)).rejects.toBeInstanceOf(ForbiddenError);
+    }
+    const untouched = await getSubscription(other.garageId);
+    expect(untouched.status).toBe("TRIALING");
+    expect((await prisma.user.findUnique({ where: { id: g.owner.userId } }))?.platformAdmin).toBe(false);
+  });
+
+  it("un administrateur désactivé perd l'accès", async () => {
+    const g = await garage("PlatInactive");
+    await prisma.user.update({ where: { id: g.owner.userId }, data: { platformAdmin: true, active: false } });
+    await expect(listGarages(g.owner.userId)).rejects.toBeInstanceOf(ForbiddenError);
   });
 });
 
