@@ -2,6 +2,7 @@ import type { SuppressionKind } from "@prisma/client";
 import { emailDomain, isWebmailDomain, normalizeEmail, normalizeSiret } from "@/lib/growth/normalize";
 import { prisma, type Tx } from "@/server/db";
 import { AppError } from "@/server/lib/errors";
+import { assertPlatformActor } from "@/server/services/platform";
 
 /**
  * Liste d'opposition. Elle ne contient que l'identifiant à exclure (email,
@@ -48,6 +49,7 @@ export async function isSuppressed(target: { email?: string; siret?: string | nu
   return (await tx.suppressionEntry.count({ where: { OR: or } })) > 0;
 }
 
-export async function listSuppressions(take = 200) {
+export async function listSuppressions(actorId: string, take = 200) {
+  await assertPlatformActor(actorId);
   return prisma.suppressionEntry.findMany({ orderBy: { createdAt: "desc" }, take });
 }

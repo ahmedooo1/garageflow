@@ -12,6 +12,7 @@ import type { CsvLead } from "./csv";
 import type { LeadCandidate } from "./sirene";
 import { addSuppression, isSuppressed } from "./suppression";
 import { checkWebsite, type CheckOptions } from "./website";
+import { assertPlatformActor } from "@/server/services/platform";
 
 type Db = Tx | typeof prisma;
 
@@ -116,6 +117,7 @@ export async function importCsvLeads(rows: CsvLead[], actorId: string): Promise<
   const result = { created: 0, updated: 0, suppressed: 0 };
   const now = new Date();
   for (const row of rows) {
+  await assertPlatformActor(actorId);
     if (await isSuppressed({ email: row.email, siret: row.siret })) {
       result.suppressed++;
       continue;
@@ -176,6 +178,7 @@ export const manualLeadSchema = z.object({
 });
 
 export async function createManualLead(input: z.input<typeof manualLeadSchema>, actorId: string) {
+  await assertPlatformActor(actorId);
   const data = parseOrThrow(manualLeadSchema, input);
   const sourceUrl = normalizeUrl(data.sourceUrl);
   if (!sourceUrl) throw new AppError("Source invalide : indiquez l'adresse de la page consultée");
@@ -260,6 +263,7 @@ export async function rescoreAll(): Promise<{ scored: number; qualified: number 
 
 /** Vérifie le site déclaré, conserve les signaux et, si elles manquent, les coordonnées publiées. */
 export async function enrichLeadWebsite(leadId: string, opts: CheckOptions & { actorId?: string } = {}) {
+  if (opts.actorId != null) await assertPlatformActor(opts.actorId);
   const lead = await prisma.lead.findUnique({ where: { id: leadId } });
   if (!lead) throw new NotFoundError("Prospect introuvable");
   if (!lead.website) throw new AppError("Aucun site web renseigné pour ce garage");
@@ -292,7 +296,8 @@ export async function enrichLeadWebsite(leadId: string, opts: CheckOptions & { a
 
 export type LeadFilters = { q?: string; stage?: string; zone?: string; minScore?: number; hasEmail?: boolean; demo?: boolean; due?: boolean; take?: number };
 
-export async function listLeads(f: LeadFilters = {}) {
+export async function listLeads(actorId: string, f: LeadFilters = {}) {
+  await assertPlatformActor(actorId);
   const where: Prisma.LeadWhereInput = {};
   if (f.stage && (LEAD_STAGES as readonly string[]).includes(f.stage)) where.stage = f.stage as LeadStage;
   if (f.zone && isZoneKey(f.zone)) where.zone = f.zone;
@@ -310,7 +315,8 @@ export async function listLeads(f: LeadFilters = {}) {
   });
 }
 
-export async function getLead(id: string) {
+export async function getLead(actorId: string, id: string) {
+  await assertPlatformActor(actorId);
   const lead = await prisma.lead.findUnique({
     where: { id },
     include: {
@@ -334,6 +340,7 @@ export const contactSchema = z.object({
 
 /** Coordonnées saisies par l'admin : chaque email et téléphone doit citer sa source. */
 export async function updateLeadContact(leadId: string, input: z.input<typeof contactSchema>, actorId: string) {
+  await assertPlatformActor(actorId);
   const data = parseOrThrow(contactSchema, input);
   const lead = await prisma.lead.findUnique({ where: { id: leadId } });
   if (!lead) throw new NotFoundError("Prospect introuvable");
@@ -367,6 +374,7 @@ export async function updateLeadContact(leadId: string, input: z.input<typeof co
 }
 
 export async function setLeadStage(leadId: string, stage: LeadStage, actorId: string, note = "") {
+  await assertPlatformActor(actorId);
   if (!(LEAD_STAGES as readonly string[]).includes(stage)) throw new AppError("Étape inconnue");
   const lead = await prisma.lead.findUnique({ where: { id: leadId } });
   if (!lead) throw new NotFoundError("Prospect introuvable");
@@ -391,6 +399,7 @@ export async function setLeadStage(leadId: string, stage: LeadStage, actorId: st
 }
 
 export async function addLeadNote(leadId: string, text: string, actorId: string) {
+  await assertPlatformActor(actorId);
   const note = text.trim();
   if (!note) throw new AppError("Note vide");
   if (!(await prisma.lead.findUnique({ where: { id: leadId }, select: { id: true } }))) throw new NotFoundError("Prospect introuvable");
@@ -398,6 +407,7 @@ export async function addLeadNote(leadId: string, text: string, actorId: string)
 }
 
 export async function setFollowUp(leadId: string, when: Date | null, actorId: string) {
+  await assertPlatformActor(actorId);
   if (when && Number.isNaN(when.getTime())) throw new AppError("Date invalide");
   await prisma.lead.update({ where: { id: leadId }, data: { nextFollowUpAt: when } });
   await logActivity(leadId, "follow_up", when ? `Relance prévue le ${when.toISOString().slice(0, 10)}` : "Relance annulée", { actorId });
@@ -405,6 +415,7 @@ export async function setFollowUp(leadId: string, when: Date | null, actorId: st
 
 /** Réponse reçue (hors application) : consignée par l'admin, avec une éventuelle objection. */
 export async function logReply(leadId: string, input: { summary: string; objection?: string; optOut?: boolean }, actorId: string) {
+  await assertPlatformActor(actorId);
   const summary = input.summary.trim();
   if (!summary) throw new AppError("Résumez la réponse reçue");
   await prisma.lead.update({ where: { id: leadId }, data: { objection: (input.objection ?? "").trim().slice(0, 500) || undefined } });
@@ -465,6 +476,7 @@ export async function syncConversions(): Promise<{ converted: number }> {
  * que le garage ne soit pas collecté à nouveau.
  */
 export async function eraseLead(leadId: string, actorId: string, reason = "Effacement demandé") {
+  await assertPlatformActor(actorId);
   const lead = await prisma.lead.findUnique({ where: { id: leadId } });
   if (!lead) throw new NotFoundError("Prospect introuvable");
   await prisma.$transaction(async (tx) => {

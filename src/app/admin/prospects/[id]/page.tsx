@@ -26,11 +26,11 @@ function SourceLink({ href, children }: { href: string; children: React.ReactNod
 }
 
 export default async function ProspectPage({ params }: { params: Promise<{ id: string }> }) {
-  await requirePlatformAdmin();
+  const admin = await requirePlatformAdmin();
   const { id } = await params;
   let lead: Awaited<ReturnType<typeof getLead>>;
   try {
-    lead = await getLead(id);
+    lead = await getLead(admin.id, id);
   } catch (e) {
     if (isAppError(e) && e.status === 404) notFound();
     throw e;

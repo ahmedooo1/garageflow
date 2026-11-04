@@ -36,8 +36,8 @@ function Check({ ok, label }: { ok: boolean; label: string }) {
 }
 
 export default async function GrowthPage() {
-  await requirePlatformAdmin();
-  const [m, runs, settings, queue, suppressions] = await Promise.all([growthMetrics(), listJobRuns(20), getGrowthSettings(), listDraftQueue(), listSuppressions(50)]);
+  const admin = await requirePlatformAdmin();
+  const [m, runs, settings, queue, suppressions] = await Promise.all([growthMetrics(), listJobRuns(admin.id, 20), getGrowthSettings(), listDraftQueue(admin.id), listSuppressions(admin.id, 50)]);
   const missing = missingSenderFields();
   const problems = outreachConfigProblems();
   const smtpProblems = smtpOutreachProblems();

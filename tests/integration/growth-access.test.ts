@@ -82,6 +82,48 @@ describe("accès à la prospection", () => {
     expect(result.ok).toBe(true);
   });
 
+  it("couche de données : sans administrateur plateforme actif relu en base, rien n'est lu ni modifié", async () => {
+    const g = await createTestGarage("GrowthDal");
+    garages.push(g.garageId);
+    await upsertSireneCandidate({
+      siret: "77777777700011", siren: "777777777", name: "Garage Cloison Dal", address: "", postalCode: "76500", city: "Elbeuf", zone: "elbeuf",
+      nafCode: "45.20A", companyCreatedOn: null, workforceRange: "01", establishmentsCount: 1, sourceUrl: "https://annuaire-entreprises.data.gouv.fr/etablissement/77777777700011", sourceFetchedAt: new Date(),
+    });
+    const lead = await prisma.lead.findUniqueOrThrow({ where: { siret: "77777777700011" } });
+    const leads = await import("@/server/growth/leads");
+    const outreach = await import("@/server/growth/outreach");
+    const { listSuppressions } = await import("@/server/growth/suppression");
+    const { listJobRuns, runJob } = await import("@/server/growth/jobs");
+    for (const actor of [g.owner.userId, g.technician.userId, "", "utilisateur-inexistant"]) {
+      for (const call of [
+        () => leads.listLeads(actor),
+        () => leads.getLead(actor, lead.id),
+        () => leads.setLeadStage(lead.id, "CONTACTED", actor),
+        () => leads.addLeadNote(lead.id, "note", actor),
+        () => leads.eraseLead(lead.id, actor),
+        () => leads.enrichLeadWebsite(lead.id, { actorId: actor }),
+        () => outreach.listDraftQueue(actor),
+        () => outreach.createDraft(lead.id, "FIRST_CONTACT", { actorId: actor }),
+        () => listSuppressions(actor),
+        () => listJobRuns(actor),
+        () => runJob("score", { dryRun: true, trigger: "test", actorId: actor }),
+        () => updateGrowthSettings({ paused: true }, actor),
+      ]) {
+        await expect(call()).rejects.toThrow(/réservé à l'équipe GarageFlow/);
+      }
+    }
+    const after = await prisma.lead.findUniqueOrThrow({ where: { id: lead.id } });
+    expect(after.stage).toBe(lead.stage);
+    expect(await prisma.outreachDraft.count({ where: { leadId: lead.id } })).toBe(0);
+    expect((await prisma.growthSettings.findFirst())?.paused ?? false).toBe(false);
+
+    // Administrateur désactivé : refusé lui aussi. Puis contrôle positif.
+    await prisma.user.update({ where: { id: g.owner.userId }, data: { platformAdmin: true, active: false } });
+    await expect(leads.listLeads(g.owner.userId)).rejects.toThrow(/réservé/);
+    await prisma.user.update({ where: { id: g.owner.userId }, data: { active: true } });
+    expect((await leads.listLeads(g.owner.userId)).some((l) => l.id === lead.id)).toBe(true);
+  });
+
   it("le formulaire public de démo ignore les robots (champ piège)", async () => {
     session.current = null;
     const result = await actions.demoRequestAction({ ok: false }, form({ name: "Bot", garageName: "Bot", postalCode: "76000", email: "bot@bot.test", website: "http://spam" }));
@@ -95,6 +137,7 @@ describe("rédaction assistée", () => {
     delete process.env.ANTHROPIC_API_KEY;
     const g = await createTestGarage("GrowthAi");
     garages.push(g.garageId);
+    await prisma.user.update({ where: { id: g.owner.userId }, data: { platformAdmin: true } });
     await updateGrowthSettings({ aiEnabled: true }, g.owner.userId);
     expect(await aiAvailability()).toEqual({ available: false, reason: "ANTHROPIC_API_KEY absente" });
 
@@ -115,6 +158,7 @@ describe("rédaction assistée", () => {
     process.env.ANTHROPIC_API_KEY = "sk-test-non-utilisee";
     const g = await createTestGarage("GrowthBudget");
     garages.push(g.garageId);
+    await prisma.user.update({ where: { id: g.owner.userId }, data: { platformAdmin: true } });
     await updateGrowthSettings({ aiEnabled: true, aiMonthlyBudgetUsd: 1 }, g.owner.userId);
     await prisma.aiUsage.create({ data: { purpose: "outreach_draft", model: "claude-opus-5-5", costMicroUsd: 999_000 } });
     expect(await aiAvailability()).toEqual({ available: false, reason: "budget mensuel atteint" });

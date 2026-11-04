@@ -12,6 +12,7 @@ import { createDraft } from "./outreach";
 import { discoverZone, type FetchLike } from "./sirene";
 import { getGrowthSettings, intEnv, isGrowthPaused } from "./settings";
 import { isSuppressed } from "./suppression";
+import { assertPlatformActor } from "@/server/services/platform";
 
 /**
  * Tâches planifiées de la prospection. Toutes sont :
@@ -206,6 +207,7 @@ const HANDLERS: Record<JobName, (ctx: JobContext) => Promise<Stats>> = {
 export type RunOptions = { dryRun?: boolean; trigger: string; force?: boolean; now?: Date; fetchImpl?: FetchLike; actorId?: string | null };
 
 export async function runJob(job: JobName, opts: RunOptions) {
+  if (opts.actorId != null) await assertPlatformActor(opts.actorId);
   const now = opts.now ?? new Date();
   const dryRun = Boolean(opts.dryRun);
   if (await isGrowthPaused()) {
@@ -245,7 +247,8 @@ export async function runJob(job: JobName, opts: RunOptions) {
   }
 }
 
-export async function listJobRuns(take = 30) {
+export async function listJobRuns(actorId: string, take = 30) {
+  await assertPlatformActor(actorId);
   return prisma.growthJobRun.findMany({ orderBy: { startedAt: "desc" }, take });
 }
 

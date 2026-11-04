@@ -13,6 +13,7 @@ import { generateAiDraft, type DraftFacts } from "./ai";
 import { logActivity } from "./leads";
 import { addSuppression, isSuppressed } from "./suppression";
 import { getSenderIdentity, intEnv, isGrowthPaused, outreachConfigProblems, smtpOutreachProblems } from "./settings";
+import { assertPlatformActor } from "@/server/services/platform";
 
 /**
  * Messages de prospection : préparés automatiquement ou à la demande, jamais
@@ -185,6 +186,7 @@ export type CreateDraftOptions = { useAi?: boolean; actorId?: string | null };
 
 /** Prépare un brouillon. Une seule relance par prospect, et seulement après un premier envoi. */
 export async function createDraft(leadId: string, kind: DraftKind, opts: CreateDraftOptions = {}) {
+  if (opts.actorId != null) await assertPlatformActor(opts.actorId);
   const lead = await prisma.lead.findUnique({ where: { id: leadId } });
   if (!lead) throw new NotFoundError("Prospect introuvable");
   await assertContactable(lead);
@@ -222,6 +224,7 @@ export async function createDraft(leadId: string, kind: DraftKind, opts: CreateD
 
 /** Toute modification annule l'approbation : on approuve le texte exact qui partira. */
 export async function updateDraft(draftId: string, input: { subject: string; body: string }, actorId: string) {
+  await assertPlatformActor(actorId);
   const draft = await prisma.outreachDraft.findUnique({ where: { id: draftId }, include: { lead: true } });
   if (!draft) throw new NotFoundError("Brouillon introuvable");
   if (draft.status !== "DRAFT" && draft.status !== "APPROVED") throw new AppError("Ce message n'est plus modifiable");
@@ -235,6 +238,7 @@ export async function updateDraft(draftId: string, input: { subject: string; bod
 }
 
 export async function approveDraft(draftId: string, actorId: string) {
+  await assertPlatformActor(actorId);
   const draft = await prisma.outreachDraft.findUnique({ where: { id: draftId }, include: { lead: true } });
   if (!draft) throw new NotFoundError("Brouillon introuvable");
   if (draft.status !== "DRAFT") throw new AppError("Seul un brouillon peut être approuvé");
@@ -251,6 +255,7 @@ export async function approveDraft(draftId: string, actorId: string) {
 }
 
 export async function discardDraft(draftId: string, actorId: string) {
+  await assertPlatformActor(actorId);
   const draft = await prisma.outreachDraft.findUnique({ where: { id: draftId } });
   if (!draft) throw new NotFoundError("Brouillon introuvable");
   if (draft.status === "SENT") throw new AppError("Un message envoyé ne peut pas être abandonné");
@@ -294,6 +299,7 @@ async function recordSent(draft: { id: string; leadId: string; kind: DraftKind }
 
 /** Envoi SMTP d'un message approuvé, un par un, sur action explicite d'un admin. */
 export async function sendApprovedDraft(draftId: string, actorId: string) {
+  await assertPlatformActor(actorId);
   if (!sendingEnabled()) throw new AppError("Envoi depuis GarageFlow désactivé (OUTREACH_SEND_ENABLED). Envoyez depuis votre messagerie puis marquez le message comme envoyé.");
   const problems = [...outreachConfigProblems(), ...smtpOutreachProblems()];
   if (problems.length) throw new AppError(`Configuration incomplète : ${problems.join(" ; ")}`);
@@ -321,13 +327,15 @@ export async function sendApprovedDraft(draftId: string, actorId: string) {
 
 /** L'admin a envoyé le texte approuvé depuis sa propre messagerie. */
 export async function markDraftSentManually(draftId: string, actorId: string) {
+  await assertPlatformActor(actorId);
   const draft = await assertSendable(draftId);
   const claimed = await prisma.outreachDraft.updateMany({ where: { id: draftId, status: "APPROVED" }, data: { status: "SENT", sentAt: new Date(), sentById: actorId, sentVia: "manual" } });
   if (claimed.count !== 1) throw new AppError("Ce message est déjà marqué comme envoyé");
   await recordSent(draft, "manual", actorId);
 }
 
-export async function listDraftQueue() {
+export async function listDraftQueue(actorId: string) {
+  await assertPlatformActor(actorId);
   return prisma.outreachDraft.findMany({
     where: { status: { in: ["DRAFT", "APPROVED"] } },
     orderBy: { createdAt: "asc" },

@@ -1,5 +1,6 @@
 import { prisma } from "@/server/db";
 import { audit } from "@/server/services/audit";
+import { assertPlatformActor } from "@/server/services/platform";
 
 export type GrowthConfig = {
   paused: boolean;
@@ -19,6 +20,7 @@ export async function isGrowthPaused(): Promise<boolean> {
 }
 
 export async function updateGrowthSettings(patch: Partial<GrowthConfig>, actorId: string): Promise<GrowthConfig> {
+  await assertPlatformActor(actorId);
   const data: Partial<GrowthConfig> = {};
   if (patch.paused !== undefined) data.paused = patch.paused;
   if (patch.aiEnabled !== undefined) data.aiEnabled = patch.aiEnabled;

@@ -14,9 +14,9 @@ export const dynamic = "force-dynamic";
 type Search = { q?: string; stage?: string; zone?: string; minScore?: string; email?: string; demo?: string; due?: string };
 
 export default async function ProspectsPage({ searchParams }: { searchParams: Promise<Search> }) {
-  await requirePlatformAdmin();
+  const admin = await requirePlatformAdmin();
   const sp = await searchParams;
-  const leads = await listLeads({
+  const leads = await listLeads(admin.id, {
     q: sp.q,
     stage: sp.stage,
     zone: sp.zone,
