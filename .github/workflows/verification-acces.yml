@@ -1,0 +1,155 @@
+name: Vérification des accès (production)
+
+# Contrôle du site en ligne par son URL publique, depuis un runner GitHub,
+# comme le ferait n'importe quel visiteur. Aucun déploiement, aucun accès SSH :
+# la clé de déploiement du VPS ne peut lancer que le script de déploiement.
+#
+# Le script vient toujours de master (le code en ligne), quelle que soit la
+# branche qui lance ce workflow.
+#
+# Comptes de test, facultatifs, dans l'environnement « verification-acces »
+# (Settings > Environments) :
+#   GF_TEST_GARAGE_EMAIL / GF_TEST_GARAGE_PASSWORD : compte garage sans rôle plateforme
+#   GF_ADMIN_EMAIL / GF_ADMIN_PASSWORD             : compte administrateur plateforme
+# Sans eux, les scénarios correspondants sont signalés comme non vérifiés.
+# Le cookie de session n'est jamais affiché : il est masqué dans le journal,
+# gardé dans un fichier lisible du seul runner, puis la session est fermée.
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/remote-control-bkgpep]
+    paths: [.github/workflows/verification-acces.yml]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verification-acces
+  cancel-in-progress: false
+
+jobs:
+  verifier:
+    name: Contrôle d'accès du site en ligne
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: verification-acces
+    env:
+      BASE: https://garageflow.aaweb.fr
+      HAS_GARAGE: ${{ secrets.GF_TEST_GARAGE_EMAIL != '' && secrets.GF_TEST_GARAGE_PASSWORD != '' }}
+      HAS_ADMIN: ${{ secrets.GF_ADMIN_EMAIL != '' && secrets.GF_ADMIN_PASSWORD != '' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+          persist-credentials: false
+
+      - name: Visiteur anonyme
+        id: anonyme
+        run: sh scripts/verifier-acces-production.sh "$BASE"
+
+      - name: Outils de connexion
+        if: ${{ !cancelled() && (env.HAS_GARAGE == 'true' || env.HAS_ADMIN == 'true') }}
+        uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        if: ${{ !cancelled() && (env.HAS_GARAGE == 'true' || env.HAS_ADMIN == 'true') }}
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Installation de Playwright
+        if: ${{ !cancelled() && (env.HAS_GARAGE == 'true' || env.HAS_ADMIN == 'true') }}
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm exec playwright install --with-deps chromium
+          # Connexion par le vrai formulaire ; seul le cookie est écrit, dans un fichier.
+          cat > .session.mjs <<'EOF'
+          import { chromium } from "@playwright/test";
+          import { writeFileSync, readFileSync } from "node:fs";
+          const [mode, base, file] = process.argv.slice(2);
+          const browser = await chromium.launch();
+          const ctx = await browser.newContext();
+          const page = await ctx.newPage();
+          try {
+            if (mode === "ouvrir") {
+              await page.goto(`${base}/login`);
+              await page.locator("#email").fill(process.env.GF_EMAIL ?? "");
+              await page.locator("#password").fill(process.env.GF_PASSWORD ?? "");
+              await page.getByRole("button", { name: "Se connecter" }).click();
+              await page.waitForURL(/\/app\//, { timeout: 30000 });
+              const c = (await ctx.cookies()).find((x) => x.name === "gf_session");
+              if (!c) throw new Error("connexion refusée");
+              console.log(`::add-mask::${c.value}`);
+              writeFileSync(file, `gf_session=${c.value}`, { mode: 0o600 });
+              console.log("session ouverte");
+            } else {
+              const value = readFileSync(file, "utf8").replace(/^gf_session=/, "");
+              await ctx.addCookies([{ name: "gf_session", value, url: base }]);
+              await page.goto(`${base}/app/atelier`);
+              await page.getByRole("button", { name: "Se déconnecter" }).first().click();
+              await page.waitForURL(/\/login/, { timeout: 30000 });
+              console.log("session fermée");
+            }
+          } catch (e) {
+            // Message seul : ni page, ni capture, ni trace (elles pourraient contenir le cookie).
+            console.log(`échec : ${e instanceof Error ? e.message.split("\n")[0] : "inconnu"}`);
+            process.exitCode = 1;
+          } finally {
+            await browser.close();
+          }
+          EOF
+
+      - name: Compte garage sans rôle plateforme
+        id: garage
+        if: ${{ !cancelled() && env.HAS_GARAGE == 'true' }}
+        env:
+          GF_EMAIL: ${{ secrets.GF_TEST_GARAGE_EMAIL }}
+          GF_PASSWORD: ${{ secrets.GF_TEST_GARAGE_PASSWORD }}
+        run: |
+          f="$RUNNER_TEMP/garage.cookie"
+          node .session.mjs ouvrir "$BASE" "$f"
+          rc=0
+          # Témoin : la session est valide (son propre atelier répond 200).
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 -H "Cookie: $(cat "$f")" "$BASE/app/atelier")
+          if [ "$code" = 200 ]; then echo "PASS  garage /app/atelier (témoin) -> 200"; else echo "FAIL  garage /app/atelier (témoin) -> $code"; rc=1; fi
+          GF_COOKIE="$(cat "$f")" sh scripts/verifier-acces-production.sh "$BASE" || rc=1
+          node .session.mjs fermer "$BASE" "$f" || rc=1
+          rm -f "$f"
+          exit "$rc"
+
+      - name: Administrateur plateforme
+        id: admin
+        if: ${{ !cancelled() && env.HAS_ADMIN == 'true' }}
+        env:
+          GF_EMAIL: ${{ secrets.GF_ADMIN_EMAIL }}
+          GF_PASSWORD: ${{ secrets.GF_ADMIN_PASSWORD }}
+        run: |
+          f="$RUNNER_TEMP/admin.cookie"
+          node .session.mjs ouvrir "$BASE" "$f"
+          rc=0
+          for v in doc rsc; do
+            h=""; [ "$v" = rsc ] && h="RSC: 1"
+            # -L : suit le rebond technique « ?_rsc=… » ; une redirection vers /login n'afficherait pas la console.
+            code=$(curl -s -L --max-redirs 2 -o "$RUNNER_TEMP/admin.body" -w '%{http_code}' --max-time 20 -H "Cookie: $(cat "$f")" ${h:+-H "$h"} "$BASE/admin")
+            # Seuls le statut et la présence du titre de section sont affichés, jamais le contenu.
+            if [ "$code" = 200 ] && grep -q "Garages inscrits" "$RUNNER_TEMP/admin.body"; then
+              echo "PASS  administrateur /admin ($v) -> 200, console affichée"
+            else
+              echo "FAIL  administrateur /admin ($v) -> $code"; rc=1
+            fi
+          done
+          rm -f "$RUNNER_TEMP/admin.body"
+          node .session.mjs fermer "$BASE" "$f" || rc=1
+          rm -f "$f"
+          exit "$rc"
+
+      - name: Bilan
+        if: ${{ always() }}
+        run: |
+          {
+            echo "| Scénario | Résultat |"
+            echo "| --- | --- |"
+            echo "| Visiteur anonyme | ${{ steps.anonyme.outcome == 'success' && 'PASS' || 'FAIL' }} |"
+            echo "| Compte garage sans rôle plateforme | ${{ env.HAS_GARAGE != 'true' && 'NON VÉRIFIÉ (compte de test absent)' || (steps.garage.outcome == 'success' && 'PASS' || 'FAIL') }} |"
+            echo "| Administrateur plateforme | ${{ env.HAS_ADMIN != 'true' && 'NON VÉRIFIÉ (compte absent)' || (steps.admin.outcome == 'success' && 'PASS' || 'FAIL') }} |"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
