@@ -5,6 +5,7 @@ import { assertPermission, type Ctx } from "@/server/context";
 import { prisma } from "@/server/db";
 import { AppError, NotFoundError } from "@/server/lib/errors";
 import { audit } from "./audit";
+import { assertPlatformActor } from "./platform";
 
 // ---------------------------------------------------------------------------
 // État de l'abonnement
@@ -219,6 +220,7 @@ export async function handleStripeWebhook(payload: string, signature: string): P
 export type ManualActivation = { plan: Plan; months: number };
 
 export async function activateManually(garageId: string, input: ManualActivation, actorId: string): Promise<void> {
+  await assertPlatformActor(actorId);
   const months = Math.min(Math.max(Math.round(input.months), 1), 36);
   if (!PLANS[input.plan]) throw new AppError("Plan inconnu");
   const end = new Date();
