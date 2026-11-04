@@ -47,18 +47,19 @@ model Garage {
   suspendedAt          DateTime?
   suspendedReason      String             @default("")
 
-  users      User[]
-  customers  Customer[]
-  vehicles   Vehicle[]
-  workOrders WorkOrder[]
-  photos     Photo[]
-  findings   Finding[]
-  damages    Damage[]
-  checklist  ChecklistItem[]
-  estimates  Estimate[]
-  events     TimelineEvent[]
-  audits     AuditLog[]
-  approvals  Approval[]
+  users        User[]
+  customers    Customer[]
+  vehicles     Vehicle[]
+  plateLookups PlateLookup[]
+  workOrders   WorkOrder[]
+  photos       Photo[]
+  findings     Finding[]
+  damages      Damage[]
+  checklist    ChecklistItem[]
+  estimates    Estimate[]
+  events       TimelineEvent[]
+  audits       AuditLog[]
+  approvals    Approval[]
 }
 
 enum Role {
@@ -68,18 +69,18 @@ enum Role {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  garageId     String
-  email        String   @unique
-  passwordHash String
-  firstName    String
-  lastName     String
-  role         Role     @default(TECHNICIAN)
-  active       Boolean  @default(true)
+  id            String   @id @default(cuid())
+  garageId      String
+  email         String   @unique
+  passwordHash  String
+  firstName     String
+  lastName      String
+  role          Role     @default(TECHNICIAN)
+  active        Boolean  @default(true)
   /// Accès à la console plateforme (/admin). Hors périmètre du garage.
-  platformAdmin Boolean @default(false)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  platformAdmin Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   garage         Garage               @relation(fields: [garageId], references: [id], onDelete: Cascade)
   sessions       Session[]
@@ -175,6 +176,17 @@ model Vehicle {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
+  /// Caractéristiques techniques, saisies ou confirmées après recherche par immatriculation.
+  version               String    @default("")
+  engine                String    @default("")
+  firstRegistrationDate DateTime? @db.Date
+  powerKw               Int?
+  fiscalPower           Int?
+  gearbox               String    @default("")
+  /// Origine des caractéristiques (« Saisie manuelle » ou fournisseur de la recherche).
+  technicalSource       String    @default("")
+  technicalConfirmedAt  DateTime?
+
   garage     Garage      @relation(fields: [garageId], references: [id], onDelete: Cascade)
   customer   Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
   workOrders WorkOrder[]
@@ -182,6 +194,40 @@ model Vehicle {
   @@unique([garageId, plate])
   @@index([garageId, vin])
   @@index([customerId])
+}
+
+// ---------------------------------------------------------------------------
+// Recherche par immatriculation : journal, quotas et cache
+// ---------------------------------------------------------------------------
+
+enum PlateLookupStatus {
+  FOUND
+  NOT_FOUND
+  ERROR
+}
+
+/// Une ligne par recherche. L'immatriculation n'est jamais stockée en clair
+/// (empreinte HMAC propre au garage) ; `data` ne contient que la liste blanche
+/// des caractéristiques techniques, jamais l'identité ni l'adresse du titulaire.
+model PlateLookup {
+  id        String            @id @default(cuid())
+  garageId  String
+  userId    String
+  plateHash String
+  provider  String
+  status    PlateLookupStatus
+  /// Appel compté au fournisseur (faux pour une réponse servie depuis le cache).
+  billable  Boolean           @default(true)
+  fromCache Boolean           @default(false)
+  data      Json?
+  errorCode String            @default("")
+  createdAt DateTime          @default(now())
+
+  garage Garage @relation(fields: [garageId], references: [id], onDelete: Cascade)
+
+  @@index([garageId, createdAt])
+  @@index([garageId, plateHash, createdAt])
+  @@index([createdAt])
 }
 
 // ---------------------------------------------------------------------------

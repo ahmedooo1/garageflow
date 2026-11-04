@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { requireCtx } from "@/server/context";
 import { getClientIp } from "@/server/lib/request";
 import { formToObject } from "@/server/lib/validation";
+import { lookupPlate, type PlateLookupResult } from "@/server/plate-lookup/service";
 import { createVehicle, updateVehicle, type VehicleInput } from "@/server/services/vehicles";
 import { runAction, str, type ActionState } from "./helpers";
 
@@ -39,4 +40,15 @@ export async function updateVehicleAction(_prev: ActionState, form: FormData): P
     redirect(`/app/vehicules/${id}`);
   }
   return result;
+}
+
+/**
+ * Recherche des caractéristiques techniques par immatriculation. Ne crée rien :
+ * le résultat est affiché pour confirmation, puis le formulaire est envoyé.
+ */
+export async function lookupPlateAction(plate: string): Promise<ActionState<PlateLookupResult>> {
+  return runAction(async () => {
+    const { ctx } = await requireCtx("vehicles:write");
+    return lookupPlate(ctx, typeof plate === "string" ? plate : "");
+  });
 }

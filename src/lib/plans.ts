@@ -7,6 +7,8 @@ export type PlanDefinition = {
   priceHt: number;
   /** Nombre de comptes utilisateurs actifs autorisés. */
   seats: number;
+  /** Recherches par immatriculation incluses chaque mois (coût fournisseur maîtrisé). */
+  plateLookupsPerMonth: number;
   tagline: string;
   features: readonly string[];
 };
@@ -17,6 +19,7 @@ export const PLANS: Record<Plan, PlanDefinition> = {
     name: "Atelier",
     priceHt: 59,
     seats: 5,
+    plateLookupsPerMonth: 100,
     tagline: "Pour un garage indépendant et son équipe.",
     features: [
       "Jusqu'à 5 comptes (gérant, réception, techniciens)",
@@ -31,6 +34,7 @@ export const PLANS: Record<Plan, PlanDefinition> = {
     name: "Réseau",
     priceHt: 129,
     seats: 50,
+    plateLookupsPerMonth: 300,
     tagline: "Pour les structures à forte rotation.",
     features: [
       "Jusqu'à 50 comptes utilisateurs",
@@ -48,6 +52,13 @@ export const TRIAL_DAYS = 14;
 
 /** Pendant l'essai, les limites du plan Atelier s'appliquent. */
 export const TRIAL_SEATS = PLANS.ATELIER.seats;
+
+/** L'inscription est libre : l'essai a un quota réduit pour limiter le coût d'un abus. */
+export const TRIAL_PLATE_LOOKUPS = 20;
+
+export function plateLookupQuota(access: { trialing: boolean; plan: Plan }): number {
+  return access.trialing ? TRIAL_PLATE_LOOKUPS : PLANS[access.plan].plateLookupsPerMonth;
+}
 
 export const PLAN_LABELS: Record<Plan, string> = {
   ATELIER: PLANS.ATELIER.name,

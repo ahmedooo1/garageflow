@@ -3,6 +3,7 @@ import { VehicleForm } from "@/components/vehicle-form";
 import { Card, PageHeader } from "@/components/ui";
 import { assertPermission, requireUser } from "@/server/context";
 import { prisma } from "@/server/db";
+import { plateLookupEnabled } from "@/server/plate-lookup/service";
 
 export const metadata: Metadata = { title: "Nouveau véhicule" };
 
@@ -19,7 +20,7 @@ export default async function NewVehiclePage({ searchParams }: { searchParams: P
     <div className="mx-auto max-w-2xl">
       <PageHeader title="Nouveau véhicule" back={{ href: returnTo?.startsWith("/app/") ? returnTo : customerId ? `/app/clients/${customerId}` : "/app/vehicules", label: "Retour" }} />
       <Card>
-        <VehicleForm customers={customers} customerId={customerId} returnTo={returnTo} />
+        <VehicleForm customers={customers} customerId={customerId} returnTo={returnTo} plateLookup={plateLookupEnabled()} />
       </Card>
     </div>
   );

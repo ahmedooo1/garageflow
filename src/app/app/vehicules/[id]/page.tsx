@@ -5,6 +5,7 @@ import { Pencil, Plus } from "lucide-react";
 import { StatusBadge } from "@/components/status-badge";
 import { Card, EmptyState, KV, PageHeader, Plate } from "@/components/ui";
 import { formatDateTime, formatKm, fullName } from "@/lib/format";
+import { kwToHp } from "@/lib/plate";
 import { FUEL_LABELS } from "@/lib/labels";
 import { formatEur } from "@/lib/pricing";
 import { hasPermission } from "@/lib/rbac";
@@ -71,8 +72,20 @@ export default async function VehiclePage({ params }: { params: Promise<{ id: st
               { label: "Carburant", value: FUEL_LABELS[vehicle.fuel] },
               { label: "Kilométrage", value: formatKm(vehicle.mileage) },
               { label: "Couleur", value: vehicle.color || "-" },
+              ...(vehicle.version ? [{ label: "Version", value: vehicle.version }] : []),
+              ...(vehicle.engine ? [{ label: "Motorisation", value: vehicle.engine }] : []),
+              ...(vehicle.firstRegistrationDate ? [{ label: "Mise en circulation", value: vehicle.firstRegistrationDate.toISOString().slice(0, 10).split("-").reverse().join("/") }] : []),
+              ...(vehicle.powerKw ? [{ label: "Puissance", value: `${vehicle.powerKw} kW (${kwToHp(vehicle.powerKw)} ch)` }] : []),
+              ...(vehicle.fiscalPower ? [{ label: "Puissance fiscale", value: `${vehicle.fiscalPower} CV` }] : []),
+              ...(vehicle.gearbox ? [{ label: "Boîte de vitesses", value: vehicle.gearbox }] : []),
             ]}
           />
+          {vehicle.technicalSource && (
+            <p className="mt-3 text-xs text-muted">
+              Caractéristiques : {vehicle.technicalSource.toLowerCase().startsWith("saisie") ? vehicle.technicalSource.toLowerCase() : vehicle.technicalSource}
+              {vehicle.technicalConfirmedAt ? `, le ${vehicle.technicalConfirmedAt.toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })}` : ""}
+            </p>
+          )}
           {vehicle.notes && <p className="mt-4 whitespace-pre-line rounded-[10px] bg-surface-2 p-3 text-sm">{vehicle.notes}</p>}
         </Card>
         <Card title={`Historique complet (${vehicle.workOrders.length} intervention${vehicle.workOrders.length > 1 ? "s" : ""})`}>
