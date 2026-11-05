@@ -1,0 +1,150 @@
+{
+  "vehicles": {
+    "peugeot": {
+      "A": "AB-123-CD",
+      "B": "12/03/2021",
+      "D.1": "PEUGEOT",
+      "D.2": "MLBYHZR",
+      "D.2.1": "M10PGTVP0025671",
+      "D.3": "308",
+      "E": "VF3LBYHZPMS000001",
+      "P.1": "1499",
+      "P.2": "96",
+      "P.3": "GO",
+      "P.6": "7",
+      "owner": [
+        "MARTIN JEANNE",
+        "12 RUE DES ESSAIS 76000 ROUEN"
+      ]
+    },
+    "renault": {
+      "A": "FG-456-HJ",
+      "B": "01/07/2016",
+      "D.1": "RENAULT",
+      "D.2": "BH0FB",
+      "D.2.1": "M10RENVP382E567",
+      "D.3": "CLIO",
+      "E": "VF1RJA00068000002",
+      "P.1": "898",
+      "P.2": "66",
+      "P.3": "ES",
+      "P.6": "5",
+      "owner": [
+        "DURAND PAUL",
+        "4 AVENUE DU SPECIMEN 76500 ELBEUF"
+      ]
+    },
+    "tesla": {
+      "A": "KL-789-MN",
+      "B": "15/09/2022",
+      "D.1": "TESLA",
+      "D.2": "3",
+      "D.2.1": "M10TSLVP0001E01",
+      "D.3": "MODEL 3",
+      "E": "LRW3E7EK0NC000003",
+      "P.1": "",
+      "P.2": "208",
+      "P.3": "EL",
+      "P.6": "10",
+      "owner": [
+        "PETIT CLAIRE",
+        "7 IMPASSE DES TESTS 76600 LE HAVRE"
+      ]
+    }
+  },
+  "images": {
+    "peugeot-nominal.png": {
+      "vehicle": "peugeot",
+      "variant": "nominal",
+      "masked": []
+    },
+    "peugeot-rot90.png": {
+      "vehicle": "peugeot",
+      "variant": "rot90",
+      "masked": []
+    },
+    "peugeot-rot180.png": {
+      "vehicle": "peugeot",
+      "variant": "rot180",
+      "masked": []
+    },
+    "peugeot-rot270.png": {
+      "vehicle": "peugeot",
+      "variant": "rot270",
+      "masked": []
+    },
+    "peugeot-incline.png": {
+      "vehicle": "peugeot",
+      "variant": "incline",
+      "masked": []
+    },
+    "peugeot-basse_resolution.png": {
+      "vehicle": "peugeot",
+      "variant": "basse_resolution",
+      "masked": []
+    },
+    "peugeot-flou.png": {
+      "vehicle": "peugeot",
+      "variant": "flou",
+      "masked": []
+    },
+    "peugeot-contraste_bruit.jpg": {
+      "vehicle": "peugeot",
+      "variant": "contraste_bruit",
+      "masked": []
+    },
+    "peugeot-jpeg_q30.jpg": {
+      "vehicle": "peugeot",
+      "variant": "jpeg_q30",
+      "masked": []
+    },
+    "peugeot-reflet.png": {
+      "vehicle": "peugeot",
+      "variant": "reflet",
+      "masked": []
+    },
+    "peugeot-masque.png": {
+      "vehicle": "peugeot",
+      "variant": "masque",
+      "masked": [
+        "E",
+        "P.2"
+      ]
+    },
+    "renault-nominal.png": {
+      "vehicle": "renault",
+      "variant": "nominal",
+      "masked": []
+    },
+    "renault-rot180.png": {
+      "vehicle": "renault",
+      "variant": "rot180",
+      "masked": []
+    },
+    "renault-flou.png": {
+      "vehicle": "renault",
+      "variant": "flou",
+      "masked": []
+    },
+    "tesla-nominal.png": {
+      "vehicle": "tesla",
+      "variant": "nominal",
+      "masked": []
+    },
+    "tesla-rot180.png": {
+      "vehicle": "tesla",
+      "variant": "rot180",
+      "masked": []
+    },
+    "tesla-flou.png": {
+      "vehicle": "tesla",
+      "variant": "flou",
+      "masked": []
+    },
+    "aucun-document.png": {
+      "vehicle": null,
+      "variant": "aucun_document",
+      "masked": []
+    }
+  }
+}

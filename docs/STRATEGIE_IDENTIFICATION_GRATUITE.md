@@ -131,7 +131,10 @@ Ordre de résolution, du gratuit au payant. Chaque champ garde sa source, et rie
 Règle de fusion : document signé, puis carte grise lue et confirmée, puis recherche payante, puis référentiel de type, puis décodage du
 VIN. Un désaccord entre deux sources est affiché à l'utilisateur, sans choix automatique.
 
-### 3.1 Travaux à prévoir (non réalisés)
+### 3.1 Travaux à prévoir
+
+Lot B (lecture assistée de la carte grise) : **réalisé** le 5 novembre 2026, voir [LECTURE_CARTE_GRISE.md](LECTURE_CARTE_GRISE.md). Les lots C
+(2D-Doc) et D (référentiels) attendent les vérifications décrites dans ce document.
 
 | Lot | Contenu | Effort estimé |
 | --- | --- | --- |

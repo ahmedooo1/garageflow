@@ -78,6 +78,9 @@ export default async function VehiclePage({ params }: { params: Promise<{ id: st
               ...(vehicle.powerKw ? [{ label: "Puissance", value: `${vehicle.powerKw} kW (${kwToHp(vehicle.powerKw)} ch)` }] : []),
               ...(vehicle.fiscalPower ? [{ label: "Puissance fiscale", value: `${vehicle.fiscalPower} CV` }] : []),
               ...(vehicle.gearbox ? [{ label: "Boîte de vitesses", value: vehicle.gearbox }] : []),
+              ...(vehicle.displacementCc ? [{ label: "Cylindrée", value: `${vehicle.displacementCc} cm³` }] : []),
+              ...(vehicle.tvv ? [{ label: "Type mine / TVV", value: <span className="font-mono">{vehicle.tvv}</span> }] : []),
+              ...(vehicle.cnit ? [{ label: "CNIT", value: <span className="font-mono">{vehicle.cnit}</span> }] : []),
             ]}
           />
           {vehicle.technicalSource && (

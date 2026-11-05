@@ -183,6 +183,11 @@ model Vehicle {
   powerKw               Int?
   fiscalPower           Int?
   gearbox               String    @default("")
+  /// Rubriques D.2 (type, variante, version) et D.2.1 (CNIT) de la carte grise : clés des référentiels de pièces et d'homologation.
+  tvv                   String    @default("")
+  cnit                  String    @default("")
+  /// Rubrique P.1, en cm³.
+  displacementCc        Int?
   /// Origine des caractéristiques (« Saisie manuelle » ou fournisseur de la recherche).
   technicalSource       String    @default("")
   technicalConfirmedAt  DateTime?

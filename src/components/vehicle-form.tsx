@@ -2,6 +2,7 @@
 
 import type { Vehicle } from "@prisma/client";
 import { ActionForm, SubmitButton } from "@/components/forms";
+import { CarteGriseScan } from "@/components/carte-grise-scan";
 import { PlateLookup } from "@/components/plate-lookup";
 import { Field } from "@/components/ui";
 import { formatPlate } from "@/lib/format";
@@ -53,6 +54,7 @@ export function VehicleForm({
             />
           </Field>
           {!vehicle && plateLookup && <PlateLookup />}
+          <CarteGriseScan />
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="VIN (numéro de série)" name="vin" error={state.fields?.vin}>
               <input id="vin" name="vin" className="input font-mono uppercase" defaultValue={vehicle?.vin} maxLength={17} autoCapitalize="characters" />
@@ -112,6 +114,15 @@ export function VehicleForm({
               </Field>
               <Field label="Puissance fiscale (CV)" name="fiscalPower" error={state.fields?.fiscalPower}>
                 <input id="fiscalPower" name="fiscalPower" type="number" inputMode="numeric" min={1} max={200} className="input" defaultValue={vehicle?.fiscalPower ?? ""} />
+              </Field>
+              <Field label="Cylindrée (cm³)" name="displacementCc" error={state.fields?.displacementCc}>
+                <input id="displacementCc" name="displacementCc" type="number" inputMode="numeric" min={50} max={10000} className="input" defaultValue={vehicle?.displacementCc ?? ""} />
+              </Field>
+              <Field label="Type mine / TVV (D.2)" name="tvv" error={state.fields?.tvv}>
+                <input id="tvv" name="tvv" className="input font-mono uppercase" defaultValue={vehicle?.tvv} maxLength={25} autoCapitalize="characters" />
+              </Field>
+              <Field label="CNIT (D.2.1)" name="cnit" error={state.fields?.cnit}>
+                <input id="cnit" name="cnit" className="input font-mono uppercase" defaultValue={vehicle?.cnit} maxLength={20} autoCapitalize="characters" />
               </Field>
             </div>
           </fieldset>

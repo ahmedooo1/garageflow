@@ -41,11 +41,34 @@ export const vehicleSchema = z.object({
   powerKw: optionalInt(1, 2000),
   fiscalPower: optionalInt(1, 200),
   gearbox: z.string().trim().max(40).default(""),
+  tvv: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .max(25)
+    .refine((v) => /^[A-Z0-9*]*$/.test(v), "Type, variante, version : lettres et chiffres uniquement")
+    .default(""),
+  cnit: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .max(20)
+    .refine((v) => /^[A-Z0-9]*$/.test(v), "CNIT : lettres et chiffres uniquement")
+    .default(""),
+  displacementCc: optionalInt(50, 10_000),
+  /**
+   * Caractéristiques reprises d'une lecture de carte grise faite sur l'appareil
+   * de l'utilisateur. Simple déclaration (rien ne transite par le serveur), d'où
+   * une valeur fixe et un libellé qui dit « vérifiée par l'utilisateur ».
+   */
+  technicalOrigin: z.enum(["", "carte_grise"]).catch("").default(""),
   /** Recherche par immatriculation confirmée dans le formulaire (vérifiée côté serveur). */
   plateLookupId: z.string().trim().max(64).default(""),
 });
 
-const TECHNICAL_KEYS = ["make", "model", "year", "fuel", "vin", "version", "engine", "firstRegistrationDate", "powerKw", "fiscalPower", "gearbox"] as const;
+const TECHNICAL_KEYS = ["make", "model", "year", "fuel", "vin", "version", "engine", "firstRegistrationDate", "powerKw", "fiscalPower", "gearbox", "tvv", "cnit", "displacementCc"] as const;
+const CARTE_GRISE_SOURCE = "Carte grise (lecture locale, vérifiée par l'utilisateur)";
+const sourceLabel = (origin: string) => (origin === "carte_grise" ? CARTE_GRISE_SOURCE : "Saisie manuelle");
 type VehicleData = z.output<typeof vehicleSchema>;
 
 function technicalChanged(before: Record<string, unknown>, after: VehicleData): boolean {
@@ -65,11 +88,11 @@ export async function createVehicle(ctx: Ctx, input: VehicleInput) {
   if (!customer) throw new NotFoundError("Client introuvable");
   const dup = await prisma.vehicle.findUnique({ where: { garageId_plate: { garageId: ctx.garageId, plate: data.plate } }, select: { id: true } });
   if (dup) throw new ConflictError("Un véhicule avec cette immatriculation existe déjà");
-  const { plateLookupId, ...fields } = data;
+  const { plateLookupId, technicalOrigin, ...fields } = data;
   // La source n'est jamais celle déclarée par le navigateur : elle est vérifiée en base.
   const lookupSource = await confirmedLookupSource(ctx, plateLookupId, data.plate);
   const vehicle = await prisma.vehicle.create({
-    data: { ...fields, garageId: ctx.garageId, technicalSource: lookupSource ?? "Saisie manuelle", technicalConfirmedAt: new Date() },
+    data: { ...fields, garageId: ctx.garageId, technicalSource: lookupSource ?? sourceLabel(technicalOrigin), technicalConfirmedAt: new Date() },
   });
   await audit({
     garageId: ctx.garageId,
@@ -92,10 +115,10 @@ export async function updateVehicle(ctx: Ctx, id: string, input: VehicleInput) {
   if (!customer) throw new NotFoundError("Client introuvable");
   const dup = await prisma.vehicle.findFirst({ where: { garageId: ctx.garageId, plate: data.plate, NOT: { id } }, select: { id: true } });
   if (dup) throw new ConflictError("Un autre véhicule porte déjà cette immatriculation");
-  const { plateLookupId: _ignored, ...fields } = data;
+  const { plateLookupId: _ignored, technicalOrigin, ...fields } = data;
   void _ignored;
-  // Une modification des caractéristiques en change l'origine : elles deviennent une saisie manuelle.
-  const technical = technicalChanged(existing, data) ? { technicalSource: "Saisie manuelle", technicalConfirmedAt: new Date() } : {};
+  // Une modification des caractéristiques en change l'origine : carte grise relue, ou saisie manuelle.
+  const technical = technicalChanged(existing, data) ? { technicalSource: sourceLabel(technicalOrigin), technicalConfirmedAt: new Date() } : {};
   const vehicle = await prisma.vehicle.update({ where: { id }, data: { ...fields, ...technical } });
   await audit({ garageId: ctx.garageId, userId: ctx.userId, action: "vehicle.update", entityType: "Vehicle", entityId: id, ip: ctx.ip });
   return vehicle;

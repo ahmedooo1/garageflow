@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "node scripts/copier-ocr.mjs && next dev",
+    "build": "node scripts/copier-ocr.mjs && next build",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "next typegen && tsc --noEmit",
@@ -24,6 +24,7 @@
     "@aws-sdk/client-s3": "^3.1135.0",
     "@aws-sdk/s3-request-presigner": "^3.1135.0",
     "@prisma/client": "^6.19.3",
+    "@tesseract.js-data/fra": "1.0.0",
     "bcryptjs": "^3.0.3",
     "clsx": "^2.1.1",
     "decimal.js": "^10.6.0",
@@ -35,6 +36,7 @@
     "react-dom": "^19.2.8",
     "sharp": "^0.35.4",
     "stripe": "^22.6.2",
+    "tesseract.js": "7.0.0",
     "zod": "^4.6.5"
   },
   "devDependencies": {
