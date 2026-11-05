@@ -2,6 +2,9 @@
 
 Branche `feature/identification-plaque`, 4 novembre 2026. Rien n'a été acheté, déployé, ni appelé chez un fournisseur payant.
 
+Voir aussi [STRATEGIE_IDENTIFICATION_GRATUITE.md](STRATEGIE_IDENTIFICATION_GRATUITE.md) : lecture de la carte grise, référentiels ouverts,
+matrice de décision et coût pour 1 000 véhicules. La recherche payante y devient un dernier recours.
+
 ## 1. Ce que fait la fonction
 
 Dans « Nouveau véhicule » (y compris depuis une nouvelle réception), le bouton **Rechercher les caractéristiques** interroge le
